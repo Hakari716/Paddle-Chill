@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paddle&Chill — Pickleball Court Booking</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="court-line-bg" aria-hidden="true"></div>
+
+<header class="site-header">
+  <div class="header-inner">
+    <div class="brand">
+      <span class="brand-mark">Paddle&Chill</span>
+      <span class="brand-sub">Pickleball Bookings</span>
+    </div>
+    <nav class="main-nav">
+      <button class="nav-btn active" data-view="book">Book a Court</button>
+      <button class="nav-btn" data-view="schedule">Schedule</button>
+      <button class="nav-btn" data-view="sheet">All Bookings</button>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+  <!-- ===================== BOOKING VIEW ===================== -->
+  <section id="view-book" class="view active">
+
+    <div class="hero">
+      <h1>Reserve your court.<br>No back-and-forth.</h1>
+      <p>Pick a time, see it open up on the board in real time, and you're on it.</p>
+    </div>
+
+    <div class="wizard" id="wizard">
+
+      <!-- Progress -->
+      <ol class="steps" id="stepsIndicator">
+        <li class="step-item active" data-step="1"><span class="step-num">01</span><span class="step-label">Details</span></li>
+        <li class="step-item" data-step="2"><span class="step-num">02</span><span class="step-label">Court & Time</span></li>
+        <li class="step-item" data-step="3"><span class="step-num">03</span><span class="step-label">Payment</span></li>
+        <li class="step-item" data-step="4"><span class="step-num">04</span><span class="step-label">Confirmed</span></li>
+      </ol>
+
+      <!-- STEP 1: DETAILS -->
+      <div class="step-panel active" id="step-1">
+        <h2>Who's playing?</h2>
+        <div class="field">
+          <label for="inputName">Full name</label>
+          <input type="text" id="inputName" placeholder="e.g. Maria Santos" autocomplete="name">
+        </div>
+        <div class="field">
+          <label for="inputPhone">Phone number</label>
+          <input type="tel" id="inputPhone" placeholder="e.g. 0917 123 4567" autocomplete="tel">
+        </div>
+        <div class="field-error" id="error-1"></div>
+        <div class="wizard-actions">
+          <span></span>
+          <button class="btn btn-primary" id="toStep2">Next: Choose court & time →</button>
+        </div>
+      </div>
+
+      <!-- STEP 2: Court, Date, & Time -->
+      <div class="step-panel" id="step-2">
+        <h2>Choose your court, date & time</h2>
+
+        <div class="field">
+          <label for="inputDate">Date</label>
+          <input type="date" id="inputDate">
+        </div>
+
+        <div class="field">
+          <label>Available slots</label>
+          <p class="hint">Tap an open slot to select it. Greyed-out slots are already booked.</p>
+          <div id="slotBoard" class="slot-board">
+            <p class="hint">Pick a date above to see the board.</p>
+          </div>
+        </div>
+
+        <div class="selection-summary" id="selectionSummary" hidden>
+          <span class="tag-label">Selected</span>
+          <span id="selectionText"></span>
+        </div>
+
+        <div class="field-error" id="error-2"></div>
+        <div class="wizard-actions">
+          <button class="btn btn-ghost" id="toStep1Back">← Back</button>
+          <button class="btn btn-primary" id="toStep3">Next: Payment →</button>
+        </div>
+      </div>
+
+      <!-- STEP 3: Payment -->
+      <div class="step-panel" id="step-3">
+        <h2>Payment</h2>
+
+        <div class="order-summary" id="orderSummary"></div>
+
+        <div class="field">
+          <label>Payment method</label>
+          <div class="pay-options">
+            <label class="pay-option">
+              <input type="radio" name="payMethod" value="Cash on arrival" checked>
+              <span>Cash on arrival</span>
+            </label>
+            <label class="pay-option">
+              <input type="radio" name="payMethod" value="GCash">
+              <span>GCash</span>
+            </label>
+            <label class="pay-option">
+              <input type="radio" name="payMethod" value="Bank transfer">
+              <span>Bank transfer</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="field-error" id="error-3"></div>
+        <div class="wizard-actions">
+          <button class="btn btn-ghost" id="toStep2Back">← Back</button>
+          <button class="btn btn-primary" id="confirmBooking">Confirm booking</button>
+        </div>
+      </div>
+
+      <!-- STEP 4: Confirmation -->
+      <div class="step-panel" id="step-4">
+        <div class="confirm-box">
+          <div class="confirm-check">✓</div>
+          <h2>You're on the board.</h2>
+          <p>Your court is reserved. Details below.</p>
+          <div class="confirm-details" id="confirmDetails"></div>
+          <div class="wizard-actions confirm-actions">
+            <button class="btn btn-ghost" id="bookAnother">Book another slot</button>
+            <button class="btn btn-primary" id="goToSheet">View my booking →</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ===================== Schedule ===================== -->
+  <section id="view-schedule" class="view">
+    <div class="section-head">
+      <h1>Court schedule</h1>
+      <p>See what's open across every court, month by month.</p>
+    </div>
+
+    <div class="calendar-wrap">
+      <div class="calendar-controls">
+        <button class="btn btn-ghost" id="prevMonth">← Prev</button>
+        <h2 id="calendarMonthLabel">Month Year</h2>
+        <button class="btn btn-ghost" id="nextMonth">Next →</button>
+      </div>
+      <div class="calendar-grid" id="calendarGrid"></div>
+    </div>
+
+    <div class="day-detail" id="dayDetail" hidden>
+      <h3 id="dayDetailTitle"></h3>
+      <div class="day-detail-table-wrap">
+        <div class="day-detail-table" id="dayDetailTable"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== SPREADSHEET  ===================== -->
+  <section id="view-sheet" class="view">
+    <div class="section-head">
+      <h1>All bookings</h1>
+    </div>
+
+    <div class="sheet-toolbar">
+      <input type="text" id="sheetSearch" placeholder="Search by name, court, or date…">
+    </div>
+
+    <div class="sheet-wrap">
+      <table class="sheet-table" id="sheetTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Name</th>
+            <th>Phone</th>
+            <th>Court</th>
+            <th>Date</th>
+            <th>Time</th>
+            <th>Payment</th>
+            <th>Amount</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="sheetBody"></tbody>
+      </table>
+      <p class="empty-state" id="sheetEmpty" hidden>No bookings yet. Once someone books a court, it'll show up here.</p>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <p>Paddle&Chill — booked locally in your browser. Data is stored on this device only.</p>
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script src="script.js"></script>
+</body>
+</html>
