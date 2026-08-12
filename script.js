@@ -1,6 +1,9 @@
 const supabaseUrl = "https://pkmymaxxbqacotuxiftk.supabase.co";
 const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBrbXltYXh4YnFhY290dXhpZnRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY1MzM1NTMsImV4cCI6MjEwMjEwOTU1M30.PBdkVqsOwJu6esrWrn0_GaYfTi2vrASMPKSnAMZzPvs";
-const supabase = window.supabase ? window.supabase.createClient(supabaseUrl, supabaseAnonKey) : null;
+var supabase = window.__paddleSupabaseClient || (window.supabase ? window.supabase.createClient(supabaseUrl, supabaseAnonKey) : null);
+if (supabase && !window.__paddleSupabaseClient) {
+  window.__paddleSupabaseClient = supabase;
+}
 
 const COURTS = ["Court 1", "Court 2"];
 const OPEN_HOUR = 0;          // open 24 hours
@@ -194,7 +197,7 @@ function switchView(key){
 navButtons.forEach(btn => btn.addEventListener("click", () => switchView(btn.dataset.view)));
 if(typeof window !== "undefined") {
   if(supabase) {
-    syncSupabaseBookings();
+    console.info("Supabase client initialized; startup sync is paused until the booking RLS policies are corrected.");
   }
 }
 
@@ -718,13 +721,7 @@ function renderSheet(){
    INIT
    ================================================================ */
 document.getElementById("inputDate").min = todayISO();
-if(supabase){
-  syncSupabaseBookings().then(() => {
-    renderCalendar();
-  });
-} else {
-  renderCalendar();
-}
+renderCalendar();
 
 // Payment QR preview handler
 function updatePaymentPreview(){

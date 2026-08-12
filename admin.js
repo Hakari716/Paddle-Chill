@@ -1,6 +1,9 @@
 const supabaseUrl = "https://pkmymaxxbqacotuxiftk.supabase.co";
 const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBrbXltYXh4YnFhY290dXhpZnRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY1MzM1NTMsImV4cCI6MjEwMjEwOTU1M30.PBdkVqsOwJu6esrWrn0_GaYfTi2vrASMPKSnAMZzPvs";
-const supabase = window.supabase ? window.supabase.createClient(supabaseUrl, supabaseAnonKey) : null;
+var supabase = window.__paddleSupabaseClient || (window.supabase ? window.supabase.createClient(supabaseUrl, supabaseAnonKey) : null);
+if (supabase && !window.__paddleSupabaseClient) {
+  window.__paddleSupabaseClient = supabase;
+}
 
 const STORAGE_KEY = 'paddle_chill_bookings';
 const ADMIN_KEY = 'paddle_chill_admin';
@@ -255,10 +258,9 @@ function initAdmin(){
 
 if(typeof window !== 'undefined') {
   if(supabase) {
-    syncSupabaseBookings().then(() => initAdmin());
-  } else {
-    initAdmin();
+    console.info('Supabase client initialized; admin sync is paused until the RLS policies are corrected.');
   }
+  initAdmin();
 } else {
   initAdmin();
 }
