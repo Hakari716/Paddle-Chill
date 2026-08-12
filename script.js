@@ -67,6 +67,7 @@ async function addBooking(booking){
     phone: booking.phone,
     court: booking.court,
     booking_date: booking.date,
+    time: booking.time,
     start_hour: booking.hourStart,
     end_hour: booking.hourEnd,
     duration: booking.duration,
@@ -80,21 +81,20 @@ async function addBooking(booking){
   };
 
   if(supabase){
-    const { error } = await supabase.from(BOOKINGS_TABLE).insert([payload]);
+    const { data, error } = await supabase.from(BOOKINGS_TABLE).insert([payload]).select();
     if(error){
       console.error("Supabase insert error:", error);
-      const list = getBookings();
-      list.push(booking);
-      saveBookings(list);
-      return;
+      throw new Error(error?.message || "Could not save booking to Supabase.");
     }
-  } else {
-    const list = getBookings();
-    list.push(booking);
-    saveBookings(list);
+    await syncSupabaseBookings();
+    return data;
   }
 
+  const list = getBookings();
+  list.push(booking);
+  saveBookings(list);
   await syncSupabaseBookings();
+  return [booking];
 }
 async function removeBooking(id){
   if(supabase){
@@ -197,7 +197,7 @@ function switchView(key){
 navButtons.forEach(btn => btn.addEventListener("click", () => switchView(btn.dataset.view)));
 if(typeof window !== "undefined") {
   if(supabase) {
-    console.info("Supabase client initialized; startup sync is paused until the booking RLS policies are corrected.");
+    syncSupabaseBookings();
   }
 }
 
@@ -494,10 +494,24 @@ document.getElementById("confirmBooking").addEventListener("click", async () => 
     status: method === "Cash on arrival" ? "Pending" : "Confirmed",
     createdAt: new Date().toISOString()
   };
-  await addBooking(booking);
-  renderConfirmation(booking);
-  goToStep(4);
-  showToast("Booking confirmed — you're on the board!");
+
+  try {
+    await addBooking(booking);
+    renderCalendar();
+    if (wizardState.date) {
+      showDayDetail(wizardState.date);
+    }
+    if (typeof renderSheet === 'function') {
+      renderSheet();
+    }
+    renderConfirmation(booking);
+    goToStep(4);
+    showToast("Booking confirmed — you're on the board!");
+  } catch (submitError) {
+    console.error("Booking submit failed:", submitError);
+    err.textContent = submitError?.message || "Booking could not be saved. Please try again or contact the court owner.";
+    err.classList.add('show');
+  }
 });
 
 function renderConfirmation(b){
@@ -721,7 +735,13 @@ function renderSheet(){
    INIT
    ================================================================ */
 document.getElementById("inputDate").min = todayISO();
-renderCalendar();
+if(supabase){
+  syncSupabaseBookings().then(() => {
+    renderCalendar();
+  });
+} else {
+  renderCalendar();
+}
 
 // Payment QR preview handler
 function updatePaymentPreview(){
@@ -747,9 +767,9 @@ function updatePaymentPreview(){
       img.alt = 'GCash QR code';
       label.textContent = 'GCash — scan to pay';
     } else {
-      img.src = '';
-      img.alt = method + ' QR code';
-      label.textContent = method + ' — scan to pay';
+      img.src = './img/bank_qr.jpg';
+      img.alt = 'Bank transfer QR code';
+      label.textContent = 'Bank transfer — scan to pay';
     }
   }
 }

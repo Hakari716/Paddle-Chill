@@ -175,8 +175,15 @@ function renderAdminTable(){
             return;
           }
         }
-        saveBookings(getBookings().filter(item => item.id !== id));
-        await syncSupabaseBookings();
+
+        const saved = getBookings();
+        saveBookings(saved.filter(item => item.id !== id));
+
+        const refreshed = await syncSupabaseBookings();
+        if (refreshed && Array.isArray(refreshed)) {
+          saveBookings(refreshed.filter(item => item.id !== id));
+        }
+
         renderAdminTable();
       }
     });
@@ -258,9 +265,10 @@ function initAdmin(){
 
 if(typeof window !== 'undefined') {
   if(supabase) {
-    console.info('Supabase client initialized; admin sync is paused until the RLS policies are corrected.');
+    syncSupabaseBookings().then(() => initAdmin());
+  } else {
+    initAdmin();
   }
-  initAdmin();
 } else {
   initAdmin();
 }
