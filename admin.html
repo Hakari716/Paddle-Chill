@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Paddle&Chill — Admin Bookings</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    :root {
+      --green-900:#0E2F22;
+      --green-700:#175C3E;
+      --green-600:#1D7249;
+      --green-100:#E7F1EA;
+      --green-050:#F3F8F4;
+      --ink:#12140F;
+      --ink-soft:#4B5750;
+      --white:#FFFFFF;
+      --line:#DCE6DF;
+      --line-strong:#B9CBBF;
+      --danger:#8C2F1E;
+      --danger-bg:#FBEAE6;
+      --shadow: 0 2px 4px rgba(14,47,34,0.06), 0 8px 24px rgba(14,47,34,0.08);
+      --radius: 10px;
+      --font-display:'Montserrat', sans-serif;
+      --font-body:'Montserrat', sans-serif;
+      --font-mono:'Roboto Mono', monospace;
+    }
+
+    body {
+      margin: 0;
+      font-family: var(--font-body);
+      color: var(--ink);
+      background: linear-gradient(180deg, #f3f8f4 0%, #ffffff 100%);
+      line-height: 1.5;
+    }
+
+    h1, h2, h3 {
+      font-family: var(--font-display);
+      color: var(--green-900);
+      margin: 0 0 8px;
+      letter-spacing: -0.01em;
+    }
+
+    p { color: var(--ink-soft); margin: 0 0 16px; }
+
+    .admin-shell {
+      max-width: 1200px; margin: 48px auto; padding: 0 24px 80px;
+    }
+    .admin-card {
+      background: rgba(255,255,255,0.95);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      padding: 28px;
+    }
+    .admin-login {
+      max-width: 420px; margin: 80px auto 0;
+    }
+    .admin-login h1 {
+      margin-bottom: 12px;
+      font-size: 2rem;
+    }
+    .login-form {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin-top: 18px;
+    }
+    .login-form input {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1.5px solid var(--line-strong);
+      font-size: 0.98rem;
+      font-family: var(--font-body);
+    }
+    .admin-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+    .admin-header h1 {
+      font-size: 2rem;
+      margin: 0;
+    }
+    .admin-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .admin-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .stat-card {
+      background: var(--green-050);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .stat-label {
+      display: block;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--ink-soft);
+      margin-bottom: 8px;
+      font-family: var(--font-body);
+    }
+    .stat-value {
+      font-family: var(--font-display);
+      font-size: 1.6rem;
+      color: var(--green-900);
+      font-weight: 700;
+    }
+    .admin-hidden { display: none; }
+
+    .main-nav {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .main-nav .nav-btn,
+    .main-nav .nav-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-body);
+      font-weight: 600;
+      font-size: 0.88rem;
+      background: transparent;
+      border: 1px solid transparent;
+      color: rgba(255,255,255,0.7);
+      padding: 9px 16px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: all .25s ease;
+      text-decoration: none;
+      letter-spacing: 0;
+      line-height: 1;
+    }
+    .main-nav .nav-btn:hover,
+    .main-nav .nav-link:hover {
+      color: var(--white);
+      border-color: rgba(255,255,255,0.25);
+      transform: translateY(-2px);
+    }
+    .main-nav .nav-btn.active,
+    .main-nav .nav-link.active {
+      background: rgba(255,255,255,0.15);
+      color: var(--white);
+      border-color: rgba(255,255,255,0.3);
+      backdrop-filter: blur(10px);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05);
+    }
+
+    .admin-table-action {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 32px;
+      padding: 7px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--line-strong);
+      background: transparent;
+      color: var(--ink);
+      font-family: var(--font-body);
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+    .admin-table-action:hover {
+      border-color: var(--green-700);
+      color: var(--green-700);
+      transform: translateY(-1px);
+    }
+    .admin-remove-btn {
+      background: none;
+      border: none;
+      color: var(--danger);
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-family: var(--font-body);
+      font-weight: 600;
+      padding: 7px 8px;
+      border-radius: 6px;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+    .admin-remove-btn:hover { text-decoration: underline; }
+
+    .status-pill {
+      display: inline-block;
+      font-family: var(--font-body);
+      font-weight: 700;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      padding: 4px 9px;
+      border-radius: 999px;
+      letter-spacing: 0.04em;
+    }
+    .status-confirmed { background: var(--green-100); color: var(--green-700); }
+    .status-pending { background: #FFF3D6; color: #8A6300; }
+
+    .sheet-wrap {
+      background: var(--white);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: auto;
+      margin-bottom: 60px;
+    }
+    .sheet-table { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 0.84rem; min-width: 820px; }
+    .sheet-table th {
+      background: var(--green-900);
+      color: var(--white);
+      text-align: left;
+      padding: 12px 14px;
+      font-family: var(--font-body);
+      font-weight: 600;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      position: sticky;
+      top: 0;
+    }
+    .sheet-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      border-right: 1px solid var(--line);
+      font-family: var(--font-body);
+      vertical-align: middle;
+      font-size: 0.8rem;
+    }
+    .sheet-table td:last-child, .sheet-table th:last-child { border-right: none; }
+    .sheet-table tbody tr:nth-child(even) { background: var(--green-050); }
+    .sheet-table tbody tr:hover { background: var(--green-100); }
+    .admin-actions-cell {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .field-error {
+      color: var(--danger);
+      background: var(--danger-bg);
+      border: 1px solid #F0C9BF;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 0.87rem;
+      display: none;
+    }
+    .field-error.show { display: block; }
+    .proof-thumb {
+      width: 52px;
+      height: 52px;
+      object-fit: cover;
+      border-radius: 8px;
+      border: 1px solid var(--line-strong);
+      background: #fff;
+      display: block;
+      box-shadow: 0 4px 12px rgba(14,47,34,0.08);
+    }
+    .proof-empty {
+      color: var(--ink-soft);
+      font-size: 0.8rem;
+    }
+    .proof-lightbox {
+      position: fixed;
+      inset: 0;
+      background: rgba(18, 20, 15, 0.72);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      z-index: 200;
+    }
+    .proof-lightbox.show {
+      display: flex;
+    }
+    .proof-lightbox-inner {
+      position: relative;
+      max-width: min(90vw, 760px);
+      max-height: 90vh;
+      background: var(--white);
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+    }
+    .proof-lightbox img {
+      display: block;
+      max-width: 100%;
+      max-height: 80vh;
+      object-fit: contain;
+      border-radius: 10px;
+      background: #fff;
+    }
+    .proof-lightbox-close {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 34px;
+      height: 34px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(18,20,15,0.7);
+      color: #fff;
+      font-size: 1.15rem;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="brand">
+        <span class="brand-mark">Paddle&Chill</span>
+        <span class="brand-sub">Admin Portal</span>
+      </div>
+      <nav class="main-nav">
+        <a class="nav-btn nav-link active" href="./index.html" target="_blank" rel="noreferrer">Public site</a>
+        <button class="nav-btn" id="logoutBtn" type="button">Log out</button>
+      </nav>
+    </div>
+  </header>
+
+  <div class="proof-lightbox" id="proofLightbox" aria-hidden="true">
+    <div class="proof-lightbox-inner">
+      <button class="proof-lightbox-close" type="button" id="closeProofLightbox" aria-label="Close proof image">×</button>
+      <img id="proofLightboxImage" src="" alt="Payment proof preview" />
+    </div>
+  </div>
+
+  <main class="admin-shell">
+    <section id="loginScreen" class="admin-card admin-login">
+      <h1>Admin access</h1>
+      <p>Use your admin password to view the booking records.</p>
+      <form id="loginForm" class="login-form">
+        <input id="adminPassword" type="password" placeholder="Enter admin password" autocomplete="current-password" />
+        <button class="btn btn-primary" type="submit">Open bookings</button>
+        <div class="field-error show" id="adminError" style="display:none;"></div>
+      </form>
+    </section>
+
+    <section id="adminScreen" class="admin-hidden">
+      <div class="admin-card">
+        <div class="admin-header">
+          <h1>All bookings</h1>
+          <div class="admin-actions">
+            <input id="adminSearch" type="text" placeholder="Search by name, court, or date…" style="min-width:240px; padding:10px 12px; border-radius:8px; border:1.5px solid var(--line-strong);" />
+          </div>
+        </div>
+
+        <div class="admin-stats">
+          <div class="stat-card">
+            <span class="stat-label">Total bookings</span>
+            <span class="stat-value" id="statTotal">0</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Confirmed</span>
+            <span class="stat-value" id="statConfirmed">0</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Pending</span>
+            <span class="stat-value" id="statPending">0</span>
+          </div>
+        </div>
+
+        <div class="sheet-wrap">
+          <table class="sheet-table" id="adminTable">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Name</th>
+                <th>Phone</th>
+                <th>Court</th>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Payment</th>
+                <th>Proof</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="adminTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="admin.js"></script>
+</body>
+</html>

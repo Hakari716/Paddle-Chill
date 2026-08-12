@@ -1,9 +1,3 @@
-/* ============================================================
-   Paddle&Chill — Pickleball Booking
-   Palette: deep court green, off-white, ink black
-   Type: Montserrat (display & body) / Roboto Mono (data)
-   ============================================================ */
-
 /* Custom fonts */
 @font-face {
   font-family: 'Lemonmilk';
@@ -52,7 +46,7 @@ h1,h2,h3{
 
 p{ color:var(--ink-soft); margin:0 0 16px; }
 
-/* Decorative fixed backdrop: faint court lines, never distracting */
+/* Decorative fixed backdrop */
 .court-line-bg{
   position:fixed; inset:0; z-index:-1; pointer-events:none;
   background:
@@ -210,6 +204,40 @@ main{ max-width:1080px; margin:0 auto; padding:0 24px 80px; }
   outline:none; border-color:var(--green-700);
   box-shadow:0 0 0 3px var(--green-100);
 }
+.field input.input-error{
+  border-color:var(--danger); background:var(--danger-bg);
+}
+.field input.input-error:focus{
+  box-shadow:0 0 0 3px rgba(140, 47, 30, 0.1);
+}
+.field input[type="file"]{
+  padding:8px 12px; font-size:0.85rem;
+  cursor:pointer;
+}
+.slot-selection-field{
+  position:relative;
+}
+.slot-header-row{
+  display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:0;
+}
+.slot-header-row label{
+  margin:0;
+  display:block;
+  font-weight:600;
+  font-size:0.85rem;
+  color:var(--ink);
+}
+.slot-selection-actions{
+  display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:4px;
+}
+.slot-selection-actions .hint{
+  margin:0;
+  flex:1;
+}
+.btn-clear-slots{
+  padding:8px 12px; font-size:0.8rem; min-height:36px; white-space:nowrap;
+}
+
 .hint{ font-size:0.85rem; color:var(--ink-soft); margin:0 0 12px; }
 
 .field-error{
@@ -318,11 +346,85 @@ main{ max-width:1080px; margin:0 auto; padding:0 24px 80px; }
 
 .pay-options{ display:flex; flex-direction:column; gap:10px; }
 .pay-option{
-  display:flex; align-items:center; gap:10px; border:1.5px solid var(--line-strong);
-  border-radius:8px; padding:12px 14px; cursor:pointer; transition:all .12s ease;
+  display:flex; flex-direction:row; align-items:center; justify-content:flex-start;
+  gap:12px; border:1.5px solid var(--line-strong); border-radius:14px;
+  padding:10px 16px; cursor:pointer; transition:all .25s ease;
+  background:var(--white); height:44px; width:100%;
 }
-.pay-option:has(input:checked){ border-color:var(--green-700); background:var(--green-050); }
-.pay-option input{ accent-color:var(--green-700); width:16px; height:16px; }
+.pay-option-row{
+  display:flex; align-items:center; justify-content:flex-start; gap:10px; flex:1;
+}
+.pay-option-row span{
+  display:flex; align-items:center; line-height:1; height:18px;
+}
+.pay-option.selected{
+  flex-direction:column; align-items:flex-start; background:var(--green-050);
+  border-color:var(--green-700); border-radius:14px;
+  padding:16px 18px; box-shadow:0 18px 32px rgba(14,47,34,0.08);
+  height:auto;
+}
+.pay-option.selected:has(input[value="GCash"]),
+.pay-option.selected:has(input[value="Bank transfer"]){
+  transform:scale(1.05);
+}
+.pay-option input{ accent-color:var(--green-700); width:18px; height:18px; }
+
+.pay-option .payment-qr{
+  display:none;
+  width:100%;
+  flex-direction:column;
+  align-items:center;
+  gap:10px;
+}
+.pay-option.selected .payment-qr{
+  display:flex;
+  margin-top:14px;
+  animation: qrFadeIn .25s ease;
+}
+.payment-proof-upload{
+  width:100%;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.upload-trigger{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  border:1.5px solid var(--green-700);
+  background:linear-gradient(135deg, var(--green-050), var(--white));
+  color:var(--green-700);
+  border-radius:12px;
+  padding:12px 14px;
+  cursor:pointer;
+  font-weight:600;
+  transition:all .2s ease;
+}
+.upload-trigger:hover{
+  background:var(--green-100);
+  transform:translateY(-1px);
+}
+.upload-icon{
+  font-size:1.1rem;
+  line-height:1;
+}
+.payment-proof-upload input[type="file"]{
+  display:none;
+}
+.upload-filename{
+  font-size:0.8rem;
+  color:var(--ink-soft);
+  background:var(--white);
+  border:1px dashed var(--line-strong);
+  border-radius:8px;
+  padding:8px 10px;
+  text-align:center;
+}
+@keyframes qrFadeIn{
+  from{ opacity:0; transform:translateY(-6px); }
+  to{ opacity:1; transform:translateY(0); }
+}
 
 /* ============ CONFIRMATION ============ */
 .confirm-box{ text-align:center; padding:20px 0; }
@@ -342,28 +444,36 @@ main{ max-width:1080px; margin:0 auto; padding:0 24px 80px; }
 /* ============ CALENDAR ============ */
 .calendar-wrap{
   background:var(--white); border:1px solid var(--line); border-radius:var(--radius);
-  box-shadow:var(--shadow); padding:24px; margin-bottom:28px;
+  box-shadow:var(--shadow); padding:20px 18px 18px; margin-bottom:28px;
+  width:100%; max-width:100%; overflow:hidden;
 }
 .calendar-controls{
-  display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;
+  display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;
+  width:100%;
 }
 .calendar-controls h2{ font-size:1.1rem; margin:0; }
 .calendar-grid{
-  display:grid; grid-template-columns:repeat(7,1fr); gap:6px;
+  display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:6px;
+  width:100%; max-width:100%;
+  align-items:stretch;
 }
 .cal-dow{
   font-family:var(--font-mono); font-size:0.72rem; text-transform:uppercase;
   color:var(--ink-soft); text-align:center; padding:6px 0; letter-spacing:0.05em;
 }
 .cal-day{
-  aspect-ratio:1/0.85; border:1px solid var(--line); border-radius:6px; padding:8px 6px;
+  width:100%; max-width:100%; min-width:0; aspect-ratio:1/0.9; border:1px solid var(--line); border-radius:6px; padding:7px 5px 6px;
   cursor:pointer; display:flex; flex-direction:column; justify-content:space-between;
-  transition:all .12s ease; background:var(--white);
+  transition:all .2s ease; background:var(--white); overflow:hidden;
 }
-.cal-day:hover{ border-color:var(--green-700); }
+.cal-day:hover{ border-color:var(--green-700); transform:translateY(-2px); }
 .cal-day.empty{ visibility:hidden; }
 .cal-day.today{ border-color:var(--green-700); border-width:2px; }
 .cal-day.past{ opacity:0.45; cursor:default; }
+.cal-day.selected{
+  border-color:var(--green-700); background:var(--green-050);
+  box-shadow:0 8px 24px rgba(23, 92, 62, 0.12); transform:scale(1.02);
+}
 .cal-day-num{ font-family:var(--font-mono); font-weight:600; font-size:0.85rem; }
 .cal-day-times{
   display: flex;
@@ -389,15 +499,43 @@ main{ max-width:1080px; margin:0 auto; padding:0 24px 80px; }
   text-align: center;
   padding: 1px 0;
 }
+.cal-day-expanded{
+  display:flex; flex-direction:column; gap:4px; margin-top:6px; padding-top:6px; border-top:1px solid var(--line-strong);
+  animation: qrFadeIn .25s ease;
+}
+.cal-detail-item{
+  display:flex; justify-content:space-between; gap:6px; padding:4px 5px; border-radius:4px; font-size:0.56rem; font-family:var(--font-mono); font-weight:600; line-height:1.2;
+}
+.cal-detail-item.booked{ background:var(--danger-bg); color:var(--danger); }
+.cal-detail-item.open{ background:var(--green-100); color:var(--green-700); }
+.cal-detail-item.closed{ background:#F3F3F3; color:var(--ink-soft); }
 
 .day-detail{
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.97);
   backdrop-filter: blur(10px);
   border:1px solid rgba(220, 230, 223, 0.6);
-  border-radius:var(--radius);
-  box-shadow: 0 8px 32px rgba(14, 47, 34, 0.08);
+  border-radius:18px;
+  box-shadow: 0 14px 30px rgba(14, 47, 34, 0.12);
   padding:24px;
-  margin-bottom:60px;
+  margin:18px 0 60px;
+  position:relative;
+  overflow:hidden;
+  opacity:0;
+  transform:translateY(8px);
+  transition:all .25s ease;
+}
+.day-detail.open{
+  opacity:1;
+  transform:translateY(0);
+  box-shadow:0 18px 36px rgba(14, 47, 34, 0.14);
+}
+.day-detail::before{
+  content:"";
+  position:absolute;
+  inset:0 auto auto 0;
+  width:100%;
+  height:4px;
+  background:linear-gradient(90deg, var(--green-700), var(--green-100));
 }
 .day-detail h3{ font-size:1.2rem; margin-bottom:20px; font-family:'Lemonmilk', sans-serif; }
 .day-detail-table-wrap{
@@ -408,13 +546,16 @@ main{ max-width:1080px; margin:0 auto; padding:0 24px 80px; }
   grid-auto-flow: column;
   gap: 16px;
   padding-bottom: 10px;
-  min-width: 100%;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 .time-column{
   display: flex;
   flex-direction: column;
   gap: 12px;
   min-width: 160px;
+  width: 100%;
 }
 .time-header{
   font-family: var(--font-display);
@@ -527,6 +668,11 @@ main{ max-width:1080px; margin:0 auto; padding:0 24px 80px; }
 .empty-state{ padding:40px 20px; text-align:center; color:var(--ink-soft); }
 
 /* ============ FOOTER ============ */
+.payment-qr img{
+  width:180px; height:180px; object-fit:contain; background:#fff; border-radius:12px; border:1px solid var(--line-strong);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+}
+.payment-qr-label{ font-family:var(--font-body); color:var(--ink-soft); font-size:0.9rem; }
 .site-footer{
   text-align:center; padding:24px; color:var(--ink-soft); font-size:0.8rem;
   border-top:1px solid var(--line);
@@ -544,15 +690,77 @@ main{ max-width:1080px; margin:0 auto; padding:0 24px 80px; }
 
 /* ============ RESPONSIVE ============ */
 @media (max-width:640px){
-  .header-inner{ flex-direction:column; align-items:flex-start; }
+  main{ padding:0 16px 60px; }
+  .header-inner{ flex-direction:column; align-items:flex-start; padding:14px 16px; }
+  .brand-mark{ font-size:1.1rem; }
+  .brand-sub{ letter-spacing:0.08em; }
+  .main-nav{ width:100%; }
+  .nav-btn{ flex:1 1 auto; text-align:center; padding:8px 12px; }
+
+  .hero{ padding-top:34px; }
   .hero h1{ font-size:1.7rem; }
-  .wizard{ padding:20px; }
+  .hero p{ font-size:0.96rem; }
+
+  .wizard{ padding:18px 16px; margin-bottom:40px; }
   .steps{ flex-wrap:wrap; gap:10px; }
-  .step-item{ flex:1 1 40%; }
+  .step-item{ flex:1 1 40%; padding-bottom:12px; }
+  .step-item .step-label{ font-size:0.8rem; }
+
+  .slot-selection-actions{ flex-direction:column; align-items:flex-start; }
+  .slot-selection-actions .hint{ width:100%; }
+  .btn-clear-slots{ width:100%; }
+  .slot-board{ grid-template-columns:1fr; }
+  .slot-grid{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
+
+  .pay-option{ min-height:44px; }
+  .pay-option.selected{ padding:14px 12px; }
+  .pay-option-row{ gap:8px; }
+  .pay-option-row span{ font-size:0.92rem; }
+  .payment-qr img{ width:150px; height:150px; }
+
   .wizard-actions{ flex-direction:column-reverse; align-items:stretch; }
   .wizard-actions .btn{ width:100%; }
+  .confirm-actions{ flex-direction:column; }
+
+  .calendar-wrap{ padding:14px 12px 12px; }
+  .calendar-controls{ gap:10px; flex-wrap:wrap; margin-bottom:12px; }
+  .calendar-controls h2{ font-size:0.95rem; flex:1 1 100%; text-align:center; order:2; }
+  .calendar-controls .btn{ flex:1 1 40%; min-width:110px; }
+  .calendar-grid{ gap:4px; }
   .cal-day{ aspect-ratio:1/1; padding:5px; }
   .cal-day-num{ font-size:0.75rem; }
+  .cal-day-times{ gap:1px; }
+  .cal-time-slot, .cal-time-more{ font-size:0.58rem; }
+
+  .day-detail{ padding:16px; }
+  .day-detail h3{ font-size:1rem; }
+  .day-grid{ grid-auto-columns:minmax(120px, 1fr); gap:10px; }
+  .time-column{ min-width:120px; gap:8px; }
+  .time-header{ font-size:0.8rem; padding:9px 6px; }
+  .slot-card{ min-height:82px; padding:10px 8px; }
+  .slot-name{ font-size:0.78rem; }
+  .slot-phone{ font-size:0.62rem; }
+
+  .section-head{ padding-top:32px; }
+  .section-head h1{ font-size:1.5rem; }
+
+  .admin-shell{ padding:0 12px 60px; }
+  .admin-card{ padding:18px 14px; }
+  .admin-header{ align-items:flex-start; }
+  .admin-header h1{ font-size:1.5rem; }
+  .admin-stats{ grid-template-columns:1fr; }
+  .admin-actions{ width:100%; }
+  .admin-actions input{ width:100%; min-width:0; }
+  .sheet-wrap{ overflow-x:auto; }
+  .sheet-table{ min-width:760px; }
+  .admin-actions-cell{ flex-direction:column; align-items:flex-start; gap:6px; }
+  .admin-table-action{ min-height:30px; padding:6px 8px; font-size:0.72rem; }
+  .admin-remove-btn{ padding:4px 6px; font-size:0.76rem; }
+  .proof-thumb{ width:44px; height:44px; }
+  .proof-lightbox-inner{ padding:12px; }
+  .proof-lightbox-close{ top:8px; right:8px; }
+  .sheet-table th{ padding:10px 12px; font-size:0.66rem; }
+  .sheet-table td{ padding:8px 10px; font-size:0.76rem; }
 }
 
 /* Accessibility: visible focus ring on interactive elements */

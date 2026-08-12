@@ -1,17 +1,34 @@
-/* ============================================================
-   Paddle&Chill — Pickleball Booking logic
-   Data is stored in the browser's localStorage (per device).
-   To share bookings across devices, swap the "storage" functions
-   near the top for calls to your own backend / database.
-   ============================================================ */
+const supabaseUrl = "https://pkmymaxxbqacotuxiftk.supabase.co";
+const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBrbXltYXh4YnFhY290dXhpZnRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY1MzM1NTMsImV4cCI6MjEwMjEwOTU1M30.PBdkVqsOwJu6esrWrn0_GaYfTi2vrASMPKSnAMZzPvs";
+const supabase = window.supabase ? window.supabase.createClient(supabaseUrl, supabaseAnonKey) : null;
 
-/* ---------- CONFIG: edit these to match your facility ---------- */
 const COURTS = ["Court 1", "Court 2"];
-const OPEN_HOUR = 6;          // 6 AM
-const CLOSE_HOUR = 21;        // last slot starts 8 PM (ends 9 PM)
+const OPEN_HOUR = 0;          // open 24 hours
+const CLOSE_HOUR = 24;        // last slot starts 23:00 (ends 24:00)
 const PRICE_PER_HOUR = 250;   // in PHP (₱)
 const CURRENCY = "₱";
 const STORAGE_KEY = "paddle_chill_bookings";
+const BOOKINGS_TABLE = "bookings";
+
+function normalizeBooking(row){
+  return {
+    id: row.id,
+    name: row.customer_name || row.name || "",
+    phone: row.phone || "",
+    court: row.court,
+    date: row.booking_date || row.date,
+    time: row.time || "",
+    hourStart: row.start_hour ?? row.hourStart,
+    hourEnd: row.end_hour ?? row.hourEnd,
+    duration: row.duration || 1,
+    payment: row.payment_method || row.payment || "Cash on arrival",
+    paymentProof: row.payment_proof_url || row.paymentProof || "",
+    paymentProofName: row.payment_proof_name || row.paymentProofName || "",
+    amount: Number(row.amount ?? row.total ?? 0),
+    status: row.status || "Pending",
+    createdAt: row.created_at || row.createdAt || new Date().toISOString()
+  };
+}
 
 /* ---------- STORAGE HELPERS ---------- */
 function getBookings(){
@@ -24,23 +41,82 @@ function getBookings(){
 function saveBookings(list){
   localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
 }
-function addBooking(booking){
-  const list = getBookings();
-  list.push(booking);
-  saveBookings(list);
+async function syncSupabaseBookings(){
+  if(!supabase) return;
+  try{
+    const { data, error } = await supabase.from(BOOKINGS_TABLE).select("*").order("created_at", { ascending: false });
+    if(error){
+      console.error("Supabase fetch error:", error);
+      return;
+    }
+    const normalized = (data || []).map(normalizeBooking);
+    saveBookings(normalized);
+    return normalized;
+  }catch(e){
+    console.warn("Supabase sync skipped:", e);
+    return getBookings();
+  }
 }
-function removeBooking(id){
-  saveBookings(getBookings().filter(b => b.id !== id));
+async function addBooking(booking){
+  const payload = {
+    id: booking.id,
+    customer_name: booking.name,
+    phone: booking.phone,
+    court: booking.court,
+    booking_date: booking.date,
+    start_hour: booking.hourStart,
+    end_hour: booking.hourEnd,
+    duration: booking.duration,
+    payment_method: booking.payment,
+    payment_status: booking.paymentStatus || "pending",
+    status: booking.status || "Pending",
+    amount: booking.amount,
+    payment_proof_url: booking.paymentProof || null,
+    payment_proof_name: booking.paymentProofName || null,
+    created_at: booking.createdAt || new Date().toISOString()
+  };
+
+  if(supabase){
+    const { error } = await supabase.from(BOOKINGS_TABLE).insert([payload]);
+    if(error){
+      console.error("Supabase insert error:", error);
+      const list = getBookings();
+      list.push(booking);
+      saveBookings(list);
+      return;
+    }
+  } else {
+    const list = getBookings();
+    list.push(booking);
+    saveBookings(list);
+  }
+
+  await syncSupabaseBookings();
 }
-function isSlotTaken(court, date, time){
-  return getBookings().some(b => b.court === court && b.date === date && b.time === time);
+async function removeBooking(id){
+  if(supabase){
+    const { error } = await supabase.from(BOOKINGS_TABLE).delete().eq("id", id);
+    if(error){
+      console.error("Supabase delete error:", error);
+      saveBookings(getBookings().filter(b => b.id !== id));
+      return;
+    }
+  } else {
+    saveBookings(getBookings().filter(b => b.id !== id));
+  }
+
+  await syncSupabaseBookings();
+}
+function isHourTaken(court, date, hour){
+  return getBookings().some(b => b.court === court && b.date === date && typeof b.hourStart === 'number' && typeof b.hourEnd === 'number' && hour >= b.hourStart && hour < b.hourEnd);
 }
 
 /* ---------- UTIL ---------- */
 function pad(n){ return n.toString().padStart(2,"0"); }
 function toTimeLabel(hour){
-  const h12 = ((hour + 11) % 12) + 1;
-  const ampm = hour < 12 ? "AM" : "PM";
+  const normalized = ((hour % 24) + 24) % 24;
+  const h12 = ((normalized + 11) % 12) + 1;
+  const ampm = normalized < 12 ? "AM" : "PM";
   return `${h12}:00 ${ampm}`;
 }
 function allTimeSlots(){
@@ -60,6 +136,15 @@ function formatDateNice(iso){
 function genId(){
   return "CL-" + Date.now().toString(36).toUpperCase().slice(-5) + Math.random().toString(36).slice(2,4).toUpperCase();
 }
+function readFileAsDataURL(file){
+  return new Promise((resolve, reject) => {
+    if(!file) return resolve("");
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result || "");
+    reader.onerror = () => reject(new Error("Failed to read file."));
+    reader.readAsDataURL(file);
+  });
+}
 function showToast(msg, isError){
   const t = document.getElementById("toast");
   t.textContent = msg;
@@ -74,22 +159,51 @@ function showToast(msg, isError){
    ================================================================ */
 const navButtons = document.querySelectorAll(".nav-btn");
 const views = { book: "view-book", schedule: "view-schedule", sheet: "view-sheet" };
+const ADMIN_PASSWORD = "admin123";
+let isAdminSession = false;
+
+function promptAdminAccess(){
+  const value = window.prompt("Enter admin password:");
+  if(value === null) return false;
+  if(value === ADMIN_PASSWORD){
+    isAdminSession = true;
+    return true;
+  }
+  showToast("Incorrect admin password.", true);
+  return false;
+}
 
 function switchView(key){
+  if(key === "sheet"){
+    if(!isAdminSession && !promptAdminAccess()){
+      return;
+    }
+  }
+
   navButtons.forEach(b => b.classList.toggle("active", b.dataset.view === key));
   Object.entries(views).forEach(([k, id]) => {
     document.getElementById(id).classList.toggle("active", k === key);
   });
-  if(key === "schedule") renderCalendar();
+  if(key === "schedule") {
+    renderCalendar();
+    const focusDate = wizardState.date || todayISO();
+    showDayDetail(focusDate);
+  }
   if(key === "sheet") renderSheet();
 }
 navButtons.forEach(btn => btn.addEventListener("click", () => switchView(btn.dataset.view)));
+if(typeof window !== "undefined") {
+  if(supabase) {
+    syncSupabaseBookings();
+  }
+}
 
 /* ================================================================
    BOOKING WIZARD
    ================================================================ */
 let wizardState = {
-  name: "", phone: "", court: null, date: null, time: null, hour: null, payMethod: "Cash on arrival"
+  name: "", phone: "", court: null, date: null, time: null, hour: null, payMethod: "Cash on arrival",
+  selectedHours: []
 };
 
 function goToStep(n){
@@ -103,19 +217,57 @@ function goToStep(n){
 }
 
 /* --- Step 1: details --- */
-document.getElementById("toStep2").addEventListener("click", () => {
+function validateUserDetails(){
   const name = document.getElementById("inputName").value.trim();
   const phone = document.getElementById("inputPhone").value.trim();
-  const err = document.getElementById("error-1");
+  const nameOk = name.length > 0 && /^[A-Za-zÀ-ÖØ-öø-ÿ'\-.\s]+$/.test(name);
+  const phoneDigits = phone.replace(/\D/g, "");
+  const phoneOk = phone.length > 0 && /^[0-9\s\-\+]+$/.test(phone) && phoneDigits.length >= 7;
 
-  if(!name || !phone){
-    err.textContent = "Please enter both your name and phone number.";
+  if(!name){
+    errorName.textContent = "⚠ Please enter your full name.";
+    inputName.classList.add('input-error');
+    return { valid: false, message: "Please enter your full name." };
+  }
+
+  if(!nameOk){
+    errorName.textContent = "⚠ Name should only contain letters and spaces.";
+    inputName.classList.add('input-error');
+    return { valid: false, message: "Name should only contain letters and spaces." };
+  }
+
+  if(!phone){
+    errorPhone.textContent = "⚠ Please enter your phone number.";
+    inputPhone.classList.add('input-error');
+    return { valid: false, message: "Please enter your phone number." };
+  }
+
+  if(!phoneOk){
+    errorPhone.textContent = "⚠ Phone number should contain only numbers, spaces, dashes, or plus signs.";
+    inputPhone.classList.add('input-error');
+    return { valid: false, message: "Phone number should contain only numbers, spaces, dashes, or plus signs." };
+  }
+
+  errorName.textContent = "";
+  errorPhone.textContent = "";
+  inputName.classList.remove('input-error');
+  inputPhone.classList.remove('input-error');
+  return { valid: true, name, phone };
+}
+
+document.getElementById("toStep2").addEventListener("click", () => {
+  const err = document.getElementById("error-1");
+  const validation = validateUserDetails();
+
+  if(!validation.valid){
+    err.textContent = validation.message;
     err.classList.add("show");
     return;
   }
+
   err.classList.remove("show");
-  wizardState.name = name;
-  wizardState.phone = phone;
+  wizardState.name = validation.name;
+  wizardState.phone = validation.phone;
 
   const dateInput = document.getElementById("inputDate");
   if(!dateInput.value) dateInput.value = todayISO();
@@ -129,10 +281,37 @@ document.getElementById("toStep2").addEventListener("click", () => {
 document.getElementById("toStep1Back").addEventListener("click", () => goToStep(1));
 
 document.getElementById("inputDate").addEventListener("change", () => {
-  wizardState.court = null; wizardState.time = null; wizardState.hour = null;
-  document.getElementById("selectionSummary").hidden = true;
+  wizardState.court = null; wizardState.time = null; wizardState.hour = null; wizardState.selectedHours = [];
+  updateSelectedSummary(true);
   renderSlotBoard();
 });
+
+function updateSelectedSummary(forceHide = false){
+  const summary = document.getElementById("selectionSummary");
+  const text = document.getElementById("selectionText");
+
+  if(forceHide || !wizardState.court || !wizardState.selectedHours.length){
+    summary.hidden = true;
+    if(text) text.textContent = "";
+    return;
+  }
+
+  const date = wizardState.date || document.getElementById("inputDate").value;
+  const first = wizardState.selectedHours[0];
+  const last = wizardState.selectedHours[wizardState.selectedHours.length - 1];
+  wizardState.time = `${toTimeLabel(first)} – ${toTimeLabel(last + 1)}`;
+  summary.hidden = false;
+  text.textContent = `${wizardState.court} · ${formatDateNice(date)} · ${wizardState.time} (${wizardState.selectedHours.length} hr${wizardState.selectedHours.length>1 ? "s" : ""})`;
+}
+
+function clearSelectedHours(){
+  wizardState.court = null;
+  wizardState.time = null;
+  wizardState.hour = null;
+  wizardState.selectedHours = [];
+  updateSelectedSummary(true);
+  renderSlotBoard();
+}
 
 function renderSlotBoard(){
   const board = document.getElementById("slotBoard");
@@ -147,8 +326,8 @@ function renderSlotBoard(){
     html += `<div class="slot-court-group"><div class="slot-court-title">${court}</div><div class="slot-grid">`;
     allTimeSlots().forEach(hour => {
       const time = toTimeLabel(hour);
-      const taken = isSlotTaken(court, date, time);
-      const selected = wizardState.court === court && wizardState.hour === hour;
+      const taken = isHourTaken(court, date, hour);
+      const selected = wizardState.court === court && wizardState.selectedHours.includes(hour);
       html += `<button type="button" class="slot-btn ${selected ? "selected" : ""}"
                  ${taken ? "disabled" : ""}
                  data-court="${court}" data-hour="${hour}" data-time="${time}">
@@ -161,31 +340,65 @@ function renderSlotBoard(){
 
   board.querySelectorAll(".slot-btn:not(:disabled)").forEach(btn => {
     btn.addEventListener("click", () => {
-      wizardState.court = btn.dataset.court;
-      wizardState.hour = Number(btn.dataset.hour);
-      wizardState.time = btn.dataset.time;
+      const court = btn.dataset.court;
+      const hour = Number(btn.dataset.hour);
+
+      if(!wizardState.court){
+        wizardState.court = court;
+      }
+
+      if(wizardState.court !== court){
+        wizardState.selectedHours = [];
+        wizardState.court = court;
+      }
+
+      const idx = wizardState.selectedHours.indexOf(hour);
+      if(idx === -1){
+        wizardState.selectedHours.push(hour);
+        wizardState.selectedHours.sort((a,b) => a-b);
+      } else {
+        wizardState.selectedHours.splice(idx,1);
+      }
+
+      if(!wizardState.selectedHours.length){
+        clearSelectedHours();
+        return;
+      }
+
       renderSlotBoard();
-      const summary = document.getElementById("selectionSummary");
-      summary.hidden = false;
-      document.getElementById("selectionText").textContent =
-        `${wizardState.court} · ${formatDateNice(date)} · ${wizardState.time}`;
+      updateSelectedSummary();
     });
   });
 }
 
+function resetCourtTimeSelection(){
+  wizardState.court = null;
+  wizardState.time = null;
+  wizardState.hour = null;
+  wizardState.selectedHours = [];
+  updateSelectedSummary(true);
+  document.getElementById("error-2").classList.remove("show");
+  renderSlotBoard();
+}
+
+
+document.getElementById("clearSelection").addEventListener("click", resetCourtTimeSelection);
+
 document.getElementById("toStep3").addEventListener("click", () => {
   const err = document.getElementById("error-2");
-  if(!wizardState.court || !wizardState.time){
-    err.textContent = "Please select an available court and time slot.";
+  if(!wizardState.court || !wizardState.selectedHours.length){
+    err.textContent = "Please select an available court and one or more time slots.";
     err.classList.add("show");
     return;
   }
-  // Double-check availability in case another booking was just made
-  if(isSlotTaken(wizardState.court, wizardState.date, wizardState.time)){
-    err.textContent = `${wizardState.court} at ${wizardState.time} was just booked by someone else. Please choose another slot.`;
-    err.classList.add("show");
-    renderSlotBoard();
-    return;
+  // Double-check availability for each selected hour
+  for(const h of wizardState.selectedHours){
+    if(isHourTaken(wizardState.court, wizardState.date, h)){
+      err.textContent = `${wizardState.court} at ${toTimeLabel(h)} was just booked by someone else. Please choose another slot.`;
+      err.classList.add("show");
+      renderSlotBoard();
+      return;
+    }
   }
   err.classList.remove("show");
   renderOrderSummary();
@@ -195,25 +408,70 @@ document.getElementById("toStep2Back").addEventListener("click", () => goToStep(
 
 function renderOrderSummary(){
   const box = document.getElementById("orderSummary");
+  const hours = wizardState.selectedHours.length || 0;
+  const start = hours ? wizardState.selectedHours[0] : null;
+  const end = hours ? (wizardState.selectedHours[wizardState.selectedHours.length-1] + 1) : null;
+  const timeLabel = hours ? `${toTimeLabel(start)} – ${toTimeLabel(end)}` : "";
+  const total = PRICE_PER_HOUR * hours;
   box.innerHTML = `
     <div><span>Name</span><span>${wizardState.name}</span></div>
     <div><span>Court</span><span>${wizardState.court}</span></div>
     <div><span>Date</span><span>${formatDateNice(wizardState.date)}</span></div>
-    <div><span>Time</span><span>${wizardState.time} – ${toTimeLabel(wizardState.hour + 1)}</span></div>
-    <div class="total"><span>Total (1 hr)</span><span>${CURRENCY}${PRICE_PER_HOUR}</span></div>
+    <div><span>Time</span><span>${timeLabel}</span></div>
+    <div class="total"><span>Total (${hours} hr${hours>1?"s":""})</span><span>${CURRENCY}${total}</span></div>
   `;
 }
 
 /* --- Step 3: payment --- */
-document.getElementById("confirmBooking").addEventListener("click", () => {
+document.getElementById("confirmBooking").addEventListener("click", async () => {
   const method = document.querySelector('input[name="payMethod"]:checked').value;
+  const err = document.getElementById("error-3");
+  err.textContent = '';
+  err.classList.remove('show');
 
-  // Final availability guard right before writing the booking
-  if(isSlotTaken(wizardState.court, wizardState.date, wizardState.time)){
-    const err = document.getElementById("error-3");
-    err.textContent = "That slot was just taken. Please go back and pick another.";
-    err.classList.add("show");
-    return;
+  let proofFile = null;
+  if(method === 'GCash'){
+    proofFile = document.getElementById('proofGCash').files[0];
+    if(!proofFile){
+      err.textContent = '⚠ Please upload a screenshot of your GCash payment before confirming.';
+      err.classList.add('show');
+      return;
+    }
+  } else if(method === 'Bank transfer'){
+    proofFile = document.getElementById('proofBank').files[0];
+    if(!proofFile){
+      err.textContent = '⚠ Please upload a screenshot of your bank transfer receipt before confirming.';
+      err.classList.add('show');
+      return;
+    }
+  }
+
+  // Final availability guard for each hour
+  for(const h of wizardState.selectedHours){
+    if(isHourTaken(wizardState.court, wizardState.date, h)){
+      err.textContent = `That slot at ${toTimeLabel(h)} was just taken. Please go back and pick another.`;
+      err.classList.add("show");
+      return;
+    }
+  }
+
+  const hours = wizardState.selectedHours.length;
+  const start = wizardState.selectedHours[0];
+  const end = wizardState.selectedHours[wizardState.selectedHours.length-1] + 1;
+  const timeStr = `${toTimeLabel(start)} – ${toTimeLabel(end)}`;
+  const amount = PRICE_PER_HOUR * hours;
+
+  let paymentProof = "";
+  let paymentProofName = "";
+  if(proofFile){
+    try {
+      paymentProof = await readFileAsDataURL(proofFile);
+      paymentProofName = proofFile.name;
+    } catch (e) {
+      err.textContent = '⚠ Could not read the payment proof file. Please try again.';
+      err.classList.add('show');
+      return;
+    }
   }
 
   const booking = {
@@ -222,13 +480,18 @@ document.getElementById("confirmBooking").addEventListener("click", () => {
     phone: wizardState.phone,
     court: wizardState.court,
     date: wizardState.date,
-    time: wizardState.time,
+    time: timeStr,
+    hourStart: start,
+    hourEnd: end,
+    duration: hours,
     payment: method,
-    amount: PRICE_PER_HOUR,
+    paymentProof: paymentProof,
+    paymentProofName: paymentProofName,
+    amount: amount,
     status: method === "Cash on arrival" ? "Pending" : "Confirmed",
     createdAt: new Date().toISOString()
   };
-  addBooking(booking);
+  await addBooking(booking);
   renderConfirmation(booking);
   goToStep(4);
   showToast("Booking confirmed — you're on the board!");
@@ -242,20 +505,48 @@ function renderConfirmation(b){
     <div><span>Date</span><span>${formatDateNice(b.date)}</span></div>
     <div><span>Time</span><span>${b.time}</span></div>
     <div><span>Payment</span><span>${b.payment}</span></div>
+    <div><span>Amount</span><span>${CURRENCY}${b.amount}</span></div>
     <div><span>Status</span><span>${b.status}</span></div>
   `;
 }
 
 document.getElementById("bookAnother").addEventListener("click", () => {
-  wizardState = { name:"", phone:"", court:null, date:null, time:null, hour:null, payMethod:"Cash on arrival" };
+  wizardState = {
+    name: "",
+    phone: "",
+    court: null,
+    date: null,
+    time: null,
+    hour: null,
+    payMethod: "Cash on arrival",
+    selectedHours: []
+  };
+
   document.getElementById("inputName").value = "";
   document.getElementById("inputPhone").value = "";
   document.getElementById("inputDate").value = "";
+  document.getElementById("selectionText").textContent = "";
   document.getElementById("selectionSummary").hidden = true;
+
+  document.querySelectorAll('input[name="payMethod"]').forEach(r => {
+    r.checked = r.value === "Cash on arrival";
+  });
+
+  document.querySelectorAll('.payment-proof-upload input[type="file"]').forEach(input => {
+    input.value = "";
+    const nameEl = input.closest('.payment-proof-upload')?.querySelector('.upload-filename');
+    if (nameEl) nameEl.textContent = 'No file selected';
+  });
+
+  document.getElementById("error-1").classList.remove("show");
+  document.getElementById("error-2").classList.remove("show");
+  document.getElementById("error-3").classList.remove("show");
+  updatePaymentPreview();
+  renderSlotBoard();
   goToStep(1);
 });
 
-document.getElementById("goToSheet").addEventListener("click", () => switchView("sheet"));
+document.getElementById("goToSheet").addEventListener("click", () => switchView("schedule"));
 
 
 
@@ -264,14 +555,25 @@ document.getElementById("goToSheet").addEventListener("click", () => switchView(
    ================================================================ */
 let calState = new Date();
 calState.setDate(1);
+let selectedCalendarDate = null;
+
+function setCalendarSelection(iso){
+  selectedCalendarDate = iso;
+  renderCalendar();
+  showDayDetail(iso);
+}
 
 document.getElementById("prevMonth").addEventListener("click", () => {
   calState.setMonth(calState.getMonth() - 1);
+  selectedCalendarDate = null;
   renderCalendar();
+  document.getElementById("dayDetail").hidden = true;
 });
 document.getElementById("nextMonth").addEventListener("click", () => {
   calState.setMonth(calState.getMonth() + 1);
+  selectedCalendarDate = null;
   renderCalendar();
+  document.getElementById("dayDetail").hidden = true;
 });
 
 function renderCalendar(){
@@ -293,10 +595,11 @@ function renderCalendar(){
 
   for(let d = 1; d <= daysInMonth; d++){
     const iso = `${year}-${pad(month+1)}-${pad(d)}`;
-    const dayBookings = bookings.filter(b => b.date === iso).sort((a, b) => a.time.localeCompare(b.time));
+    const dayBookings = bookings.filter(b => b.date === iso).sort((a, b) => (Number(a.hourStart) || 0) - (Number(b.hourStart) || 0));
     const isPast = iso < today;
     const isToday = iso === today;
-    let dayHtml = `<div class="cal-day ${isToday ? "today" : ""} ${isPast ? "past" : ""}" data-date="${iso}">
+    const isSelected = selectedCalendarDate === iso;
+    let dayHtml = `<div class="cal-day ${isToday ? "today" : ""} ${isPast ? "past" : ""} ${isSelected ? "selected" : ""}" data-date="${iso}">
                     <span class="cal-day-num">${d}</span>`;
     if(dayBookings.length > 0) {
       dayHtml += `<div class="cal-day-times">`;
@@ -314,7 +617,10 @@ function renderCalendar(){
   grid.innerHTML = html;
 
   grid.querySelectorAll(".cal-day[data-date]").forEach(cell => {
-    cell.addEventListener("click", () => showDayDetail(cell.dataset.date));
+    cell.addEventListener("click", () => {
+      const iso = cell.dataset.date;
+      setCalendarSelection(iso);
+    });
   });
 }
 
@@ -323,6 +629,7 @@ function showDayDetail(iso){
   const title = document.getElementById("dayDetailTitle");
   const table = document.getElementById("dayDetailTable");
   panel.hidden = false;
+  panel.classList.add("open");
   title.textContent = formatDateNice(iso);
 
   let html = `<div class="day-grid">`;
@@ -331,7 +638,7 @@ function showDayDetail(iso){
     html += `<div class="time-column">
               <div class="time-header">${time}</div>`;
     COURTS.forEach(court => {
-      const booking = getBookings().find(b => b.court === court && b.date === iso && b.time === time);
+      const booking = getBookings().find(b => b.court === court && b.date === iso && typeof b.hourStart === 'number' && hour >= b.hourStart && hour < b.hourEnd);
       if(booking) {
         html += `<div class="slot-card booked">
                   <div class="slot-court">${court}</div>
@@ -355,7 +662,10 @@ function showDayDetail(iso){
 /* ================================================================
    SHEET (SPREADSHEET) VIEW
    ================================================================ */
-document.getElementById("sheetSearch").addEventListener("input", renderSheet);
+const sheetSearchInput = document.getElementById("sheetSearch");
+if (sheetSearchInput) {
+  sheetSearchInput.addEventListener("input", renderSheet);
+}
 
 function renderSheet(){
   const q = (document.getElementById("sheetSearch").value || "").toLowerCase();
@@ -408,4 +718,91 @@ function renderSheet(){
    INIT
    ================================================================ */
 document.getElementById("inputDate").min = todayISO();
-renderCalendar();
+if(supabase){
+  syncSupabaseBookings().then(() => {
+    renderCalendar();
+  });
+} else {
+  renderCalendar();
+}
+
+// Payment QR preview handler
+function updatePaymentPreview(){
+  const method = document.querySelector('input[name="payMethod"]:checked')?.value;
+  document.querySelectorAll('.pay-option').forEach(option => {
+    const radio = option.querySelector('input[name="payMethod"]');
+    option.classList.toggle('selected', radio && radio.value === method);
+    const qr = option.querySelector('.payment-qr');
+    if(qr){
+      qr.hidden = true;
+    }
+  });
+
+  if(method === 'GCash' || method === 'Bank transfer'){
+    const selectedQr = document.querySelector('.pay-option.selected .payment-qr[data-method="' + method + '"]');
+    if(!selectedQr) return;
+    selectedQr.hidden = false;
+    const img = selectedQr.querySelector('.payment-qr-img');
+    const label = selectedQr.querySelector('.payment-qr-label');
+    if(!img || !label) return;
+    if(method === 'GCash') {
+      img.src = './img/gcash_qr.jpg';
+      img.alt = 'GCash QR code';
+      label.textContent = 'GCash — scan to pay';
+    } else {
+      img.src = '';
+      img.alt = method + ' QR code';
+      label.textContent = method + ' — scan to pay';
+    }
+  }
+}
+
+/* ================================================================
+   INPUT VALIDATION
+   ================================================================ */
+const inputName = document.getElementById('inputName');
+const inputPhone = document.getElementById('inputPhone');
+const errorName = document.getElementById('error-name');
+const errorPhone = document.getElementById('error-phone');
+
+// Validate name: allow common real-world name characters
+inputName.addEventListener('input', function(){
+  const value = this.value.trim();
+  const isValid = value.length === 0 || /^[A-Za-zÀ-ÖØ-öø-ÿ'\-.\s]+$/.test(value);
+  if(value && !isValid){
+    errorName.textContent = '⚠ Please use letters, spaces, periods, apostrophes, or hyphens only.';
+    this.classList.add('input-error');
+  } else {
+    errorName.textContent = '';
+    this.classList.remove('input-error');
+  }
+});
+
+// Validate phone: only numbers, spaces, and dashes
+inputPhone.addEventListener('input', function(){
+  const value = this.value.trim();
+  const digits = value.replace(/\D/g, '');
+  const isValid = value.length === 0 || (/^[0-9\s\-\+]+$/.test(value) && digits.length >= 7);
+  if(value && !isValid){
+    errorPhone.textContent = '⚠ Phone number should contain only numbers, spaces, dashes, or plus signs.';
+    this.classList.add('input-error');
+  } else {
+    errorPhone.textContent = '';
+    this.classList.remove('input-error');
+  }
+});
+
+document.querySelectorAll('input[name="payMethod"]').forEach(r => r.addEventListener('change', updatePaymentPreview));
+
+document.querySelectorAll('.payment-proof-upload input[type="file"]').forEach(input => {
+  input.addEventListener('change', () => {
+    const wrapper = input.closest('.payment-proof-upload');
+    const nameEl = wrapper?.querySelector('.upload-filename');
+    const fileName = input.files && input.files[0] ? input.files[0].name : 'No file selected';
+    if(nameEl){
+      nameEl.textContent = fileName;
+    }
+  });
+});
+
+updatePaymentPreview();

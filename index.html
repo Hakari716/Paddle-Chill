@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -22,14 +23,13 @@
     <nav class="main-nav">
       <button class="nav-btn active" data-view="book">Book a Court</button>
       <button class="nav-btn" data-view="schedule">Schedule</button>
-      <button class="nav-btn" data-view="sheet">All Bookings</button>
     </nav>
   </div>
 </header>
 
 <main>
 
-  <!-- ===================== BOOKING VIEW ===================== -->
+  <!-- ===================== Booking View ===================== -->
   <section id="view-book" class="view active">
 
     <div class="hero">
@@ -47,16 +47,18 @@
         <li class="step-item" data-step="4"><span class="step-num">04</span><span class="step-label">Confirmed</span></li>
       </ol>
 
-      <!-- STEP 1: DETAILS -->
+      <!-- STEP 1: Details -->
       <div class="step-panel active" id="step-1">
         <h2>Who's playing?</h2>
         <div class="field">
           <label for="inputName">Full name</label>
           <input type="text" id="inputName" placeholder="e.g. Maria Santos" autocomplete="name">
+          <div class="field-error" id="error-name"></div>
         </div>
         <div class="field">
           <label for="inputPhone">Phone number</label>
           <input type="tel" id="inputPhone" placeholder="e.g. 0917 123 4567" autocomplete="tel">
+          <div class="field-error" id="error-phone"></div>
         </div>
         <div class="field-error" id="error-1"></div>
         <div class="wizard-actions">
@@ -74,9 +76,14 @@
           <input type="date" id="inputDate">
         </div>
 
-        <div class="field">
-          <label>Available slots</label>
-          <p class="hint">Tap an open slot to select it. Greyed-out slots are already booked.</p>
+        <div class="field slot-selection-field">
+          <div class="slot-header-row">
+            <label>Available slots</label>
+          </div>
+          <div class="slot-selection-actions">
+            <p class="hint">Tap an open slot to select it. Greyed-out slots are already booked.</p>
+            <button class="btn btn-ghost btn-clear-slots" id="clearSelection" type="button">Clear selection</button>
+          </div>
           <div id="slotBoard" class="slot-board">
             <p class="hint">Pick a date above to see the board.</p>
           </div>
@@ -104,16 +111,46 @@
           <label>Payment method</label>
           <div class="pay-options">
             <label class="pay-option">
-              <input type="radio" name="payMethod" value="Cash on arrival" checked>
-              <span>Cash on arrival</span>
+              <div class="pay-option-row">
+                <input type="radio" name="payMethod" value="Cash on arrival" checked>
+                <span>Cash on arrival</span>
+              </div>
             </label>
             <label class="pay-option">
-              <input type="radio" name="payMethod" value="GCash">
-              <span>GCash</span>
+              <div class="pay-option-row">
+                <input type="radio" name="payMethod" value="GCash">
+                <span>GCash</span>
+              </div>
+              <div class="payment-qr" hidden data-method="GCash">
+                <img class="payment-qr-img" src="" alt="GCash QR code" />
+                <div class="payment-qr-label"></div>
+                <div class="payment-proof-upload">
+                  <label class="upload-trigger" for="proofGCash">
+                    <span class="upload-icon">＋</span>
+                    <span>Upload payment proof</span>
+                  </label>
+                  <input type="file" id="proofGCash" name="proofGCash" accept="image/*">
+                  <div class="upload-filename">No file selected</div>
+                </div>
+              </div>
             </label>
             <label class="pay-option">
-              <input type="radio" name="payMethod" value="Bank transfer">
-              <span>Bank transfer</span>
+              <div class="pay-option-row">
+                <input type="radio" name="payMethod" value="Bank transfer">
+                <span>Bank transfer</span>
+              </div>
+              <div class="payment-qr" hidden data-method="Bank transfer">
+                <img class="payment-qr-img" src="" alt="Bank transfer QR code" />
+                <div class="payment-qr-label"></div>
+                <div class="payment-proof-upload">
+                  <label class="upload-trigger" for="proofBank">
+                    <span class="upload-icon">＋</span>
+                    <span>Upload payment proof</span>
+                  </label>
+                  <input type="file" id="proofBank" name="proofBank" accept="image/*">
+                  <div class="upload-filename">No file selected</div>
+                </div>
+              </div>
             </label>
           </div>
         </div>
@@ -169,7 +206,7 @@
   <!-- ===================== SPREADSHEET  ===================== -->
   <section id="view-sheet" class="view">
     <div class="section-head">
-      <h1>All bookings</h1>
+      <h1>Admin bookings</h1>
     </div>
 
     <div class="sheet-toolbar">
@@ -201,7 +238,7 @@
 </main>
 
 <footer class="site-footer">
-  <p>Paddle&Chill — booked locally in your browser. Data is stored on this device only.</p>
+  <p>Paddle&Chill</p>
 </footer>
 
 <div class="toast" id="toast"></div>
