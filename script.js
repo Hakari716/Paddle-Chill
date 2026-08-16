@@ -6,12 +6,32 @@ if (supabase && !window.__paddleSupabaseClient) {
 }
 
 const COURTS = ["Court 1", "Court 2"];
-const OPEN_HOUR = 0;          // open 24 hours
-const CLOSE_HOUR = 24;        // last slot starts 23:00 (ends 24:00)
-const PRICE_PER_HOUR = 250;   // in PHP (₱)
+const OPEN_HOUR = 0;          
+const CLOSE_HOUR = 24;        
+const PRICE_PER_HOUR = 250;   
 const CURRENCY = "₱";
 const STORAGE_KEY = "paddle_chill_bookings";
 const BOOKINGS_TABLE = "bookings";
+let bookingsRealtimeChannel = null;
+
+function setupBookingsRealtime(){
+  if(!supabase || !supabase.channel || bookingsRealtimeChannel) return;
+  bookingsRealtimeChannel = supabase.channel('paddle_chill_bookings_live');
+  bookingsRealtimeChannel.on('postgres_changes', {
+    event: '*',
+    schema: 'public',
+    table: BOOKINGS_TABLE
+  }, async () => {
+    try {
+      await syncSupabaseBookings();
+      if (typeof renderCalendar === 'function') renderCalendar();
+      if (typeof renderSheet === 'function') renderSheet();
+      if (typeof showDayDetail === 'function' && wizardState.date) showDayDetail(wizardState.date);
+    } catch (e) {
+      console.warn('Realtime booking sync failed:', e);
+    }
+  }).subscribe();
+}
 
 function normalizeBooking(row){
   return {
@@ -33,7 +53,7 @@ function normalizeBooking(row){
   };
 }
 
-/* ---------- STORAGE HELPERS ---------- */
+
 function getBookings(){
   try{
     return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
@@ -114,7 +134,7 @@ function isHourTaken(court, date, hour){
   return getBookings().some(b => b.court === court && b.date === date && typeof b.hourStart === 'number' && typeof b.hourEnd === 'number' && hour >= b.hourStart && hour < b.hourEnd);
 }
 
-/* ---------- UTIL ---------- */
+
 function pad(n){ return n.toString().padStart(2,"0"); }
 function toTimeLabel(hour){
   const normalized = ((hour % 24) + 24) % 24;
@@ -157,32 +177,14 @@ function showToast(msg, isError){
   showToast._timer = setTimeout(() => t.classList.remove("show"), 2800);
 }
 
-/* ================================================================
-   NAVIGATION BETWEEN MAIN VIEWS (Book / Schedule / All Bookings)
-   ================================================================ */
+
+
+
 const navButtons = document.querySelectorAll(".nav-btn");
 const views = { book: "view-book", schedule: "view-schedule", sheet: "view-sheet" };
-const ADMIN_PASSWORD = "admin123";
 let isAdminSession = false;
 
-function promptAdminAccess(){
-  const value = window.prompt("Enter admin password:");
-  if(value === null) return false;
-  if(value === ADMIN_PASSWORD){
-    isAdminSession = true;
-    return true;
-  }
-  showToast("Incorrect admin password.", true);
-  return false;
-}
-
 function switchView(key){
-  if(key === "sheet"){
-    if(!isAdminSession && !promptAdminAccess()){
-      return;
-    }
-  }
-
   navButtons.forEach(b => b.classList.toggle("active", b.dataset.view === key));
   Object.entries(views).forEach(([k, id]) => {
     document.getElementById(id).classList.toggle("active", k === key);
@@ -197,13 +199,11 @@ function switchView(key){
 navButtons.forEach(btn => btn.addEventListener("click", () => switchView(btn.dataset.view)));
 if(typeof window !== "undefined") {
   if(supabase) {
+    setupBookingsRealtime();
     syncSupabaseBookings();
   }
 }
 
-/* ================================================================
-   BOOKING WIZARD
-   ================================================================ */
 let wizardState = {
   name: "", phone: "", court: null, date: null, time: null, hour: null, payMethod: "Cash on arrival",
   selectedHours: []
@@ -219,7 +219,6 @@ function goToStep(n){
   });
 }
 
-/* --- Step 1: details --- */
 function validateUserDetails(){
   const name = document.getElementById("inputName").value.trim();
   const phone = document.getElementById("inputPhone").value.trim();
@@ -280,7 +279,6 @@ document.getElementById("toStep2").addEventListener("click", () => {
   goToStep(2);
 });
 
-/* --- Step 2: court, date, time --- */
 document.getElementById("toStep1Back").addEventListener("click", () => goToStep(1));
 
 document.getElementById("inputDate").addEventListener("change", () => {
@@ -302,9 +300,10 @@ function updateSelectedSummary(forceHide = false){
   const date = wizardState.date || document.getElementById("inputDate").value;
   const first = wizardState.selectedHours[0];
   const last = wizardState.selectedHours[wizardState.selectedHours.length - 1];
-  wizardState.time = `${toTimeLabel(first)} – ${toTimeLabel(last + 1)}`;
+  const rangeLabel = `${toTimeLabel(first)} – ${toTimeLabel(last)}`;
+  wizardState.time = rangeLabel;
   summary.hidden = false;
-  text.textContent = `${wizardState.court} · ${formatDateNice(date)} · ${wizardState.time} (${wizardState.selectedHours.length} hr${wizardState.selectedHours.length>1 ? "s" : ""})`;
+  text.textContent = `${wizardState.court} · ${formatDateNice(date)} · ${rangeLabel} (${wizardState.selectedHours.length} hr${wizardState.selectedHours.length>1 ? "s" : ""})`;
 }
 
 function clearSelectedHours(){
@@ -356,11 +355,17 @@ function renderSlotBoard(){
       }
 
       const idx = wizardState.selectedHours.indexOf(hour);
-      if(idx === -1){
-        wizardState.selectedHours.push(hour);
-        wizardState.selectedHours.sort((a,b) => a-b);
+      if(idx !== -1){
+        wizardState.selectedHours.splice(idx, 1);
       } else {
-        wizardState.selectedHours.splice(idx,1);
+        const nextSelection = [...wizardState.selectedHours, hour].sort((a, b) => a - b);
+        const start = nextSelection[0];
+        const end = nextSelection[nextSelection.length - 1];
+        const expandedRange = [];
+        for(let current = start; current <= end; current++) {
+          expandedRange.push(current);
+        }
+        wizardState.selectedHours = expandedRange;
       }
 
       if(!wizardState.selectedHours.length){
@@ -394,7 +399,6 @@ document.getElementById("toStep3").addEventListener("click", () => {
     err.classList.add("show");
     return;
   }
-  // Double-check availability for each selected hour
   for(const h of wizardState.selectedHours){
     if(isHourTaken(wizardState.court, wizardState.date, h)){
       err.textContent = `${wizardState.court} at ${toTimeLabel(h)} was just booked by someone else. Please choose another slot.`;
@@ -425,12 +429,15 @@ function renderOrderSummary(){
   `;
 }
 
-/* --- Step 3: payment --- */
 document.getElementById("confirmBooking").addEventListener("click", async () => {
+  if (document.getElementById("confirmBooking").dataset.busy === 'true') return;
   const method = document.querySelector('input[name="payMethod"]:checked').value;
   const err = document.getElementById("error-3");
   err.textContent = '';
   err.classList.remove('show');
+  const confirmBtn = document.getElementById("confirmBooking");
+  confirmBtn.dataset.busy = 'true';
+  confirmBtn.disabled = true;
 
   let proofFile = null;
   if(method === 'GCash'){
@@ -449,7 +456,6 @@ document.getElementById("confirmBooking").addEventListener("click", async () => 
     }
   }
 
-  // Final availability guard for each hour
   for(const h of wizardState.selectedHours){
     if(isHourTaken(wizardState.court, wizardState.date, h)){
       err.textContent = `That slot at ${toTimeLabel(h)} was just taken. Please go back and pick another.`;
@@ -511,6 +517,9 @@ document.getElementById("confirmBooking").addEventListener("click", async () => 
     console.error("Booking submit failed:", submitError);
     err.textContent = submitError?.message || "Booking could not be saved. Please try again or contact the court owner.";
     err.classList.add('show');
+  } finally {
+    confirmBtn.dataset.busy = 'false';
+    confirmBtn.disabled = false;
   }
 });
 
@@ -565,11 +574,6 @@ document.getElementById("bookAnother").addEventListener("click", () => {
 
 document.getElementById("goToSheet").addEventListener("click", () => switchView("schedule"));
 
-
-
-/* ================================================================
-   SCHEDULE / CALENDAR VIEW
-   ================================================================ */
 let calState = new Date();
 calState.setDate(1);
 let selectedCalendarDate = null;
@@ -676,9 +680,6 @@ function showDayDetail(iso){
   panel.scrollIntoView({ behavior:"smooth", block:"nearest" });
 }
 
-/* ================================================================
-   SHEET (SPREADSHEET) VIEW
-   ================================================================ */
 const sheetSearchInput = document.getElementById("sheetSearch");
 if (sheetSearchInput) {
   sheetSearchInput.addEventListener("input", renderSheet);
@@ -731,9 +732,6 @@ function renderSheet(){
   });
 }
 
-/* ================================================================
-   INIT
-   ================================================================ */
 document.getElementById("inputDate").min = todayISO();
 if(supabase){
   syncSupabaseBookings().then(() => {
@@ -743,7 +741,6 @@ if(supabase){
   renderCalendar();
 }
 
-// Payment QR preview handler
 function updatePaymentPreview(){
   const method = document.querySelector('input[name="payMethod"]:checked')?.value;
   document.querySelectorAll('.pay-option').forEach(option => {
@@ -774,15 +771,11 @@ function updatePaymentPreview(){
   }
 }
 
-/* ================================================================
-   INPUT VALIDATION
-   ================================================================ */
 const inputName = document.getElementById('inputName');
 const inputPhone = document.getElementById('inputPhone');
 const errorName = document.getElementById('error-name');
 const errorPhone = document.getElementById('error-phone');
 
-// Validate name: allow common real-world name characters
 inputName.addEventListener('input', function(){
   const value = this.value.trim();
   const isValid = value.length === 0 || /^[A-Za-zÀ-ÖØ-öø-ÿ'\-.\s]+$/.test(value);
@@ -795,7 +788,6 @@ inputName.addEventListener('input', function(){
   }
 });
 
-// Validate phone: only numbers, spaces, and dashes
 inputPhone.addEventListener('input', function(){
   const value = this.value.trim();
   const digits = value.replace(/\D/g, '');

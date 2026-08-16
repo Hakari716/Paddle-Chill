@@ -7,8 +7,25 @@ if (supabase && !window.__paddleSupabaseClient) {
 
 const STORAGE_KEY = 'paddle_chill_bookings';
 const ADMIN_KEY = 'paddle_chill_admin';
-const DEFAULT_ADMIN_PASSWORD = 'admin123';
 const BOOKINGS_TABLE = 'bookings';
+let adminRealtimeChannel = null;
+
+function setupAdminRealtime(){
+  if(!supabase || !supabase.channel || adminRealtimeChannel) return;
+  adminRealtimeChannel = supabase.channel('paddle_chill_admin_bookings_live');
+  adminRealtimeChannel.on('postgres_changes', {
+    event: '*',
+    schema: 'public',
+    table: BOOKINGS_TABLE
+  }, async () => {
+    try {
+      await syncSupabaseBookings();
+      if (typeof renderAdminTable === 'function') renderAdminTable();
+    } catch (e) {
+      console.warn('Admin booking sync failed:', e);
+    }
+  }).subscribe();
+}
 
 function normalizeBookingRow(row) {
   return {
@@ -202,21 +219,40 @@ function showLoginPanel(){
   showAdminError('');
 }
 
-function loginAdmin(event){
+async function loginAdmin(event){
   event.preventDefault();
   const input = document.getElementById('adminPassword');
   const value = (input.value || '').trim();
 
-  if (value === DEFAULT_ADMIN_PASSWORD) {
+  if (!value) {
+    setAdminAuthenticated(false);
+    showAdminError('Please enter the admin password.');
+    return;
+  }
+
+  try {
+    const response = await fetch('/api/admin-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: value })
+    });
+    const result = await response.json().catch(() => ({ ok: false, message: 'Admin login is unavailable right now.' }));
+
+    if (!response.ok || !result.ok) {
+      setAdminAuthenticated(false);
+      showAdminError(result.message || 'Incorrect admin password.');
+      return;
+    }
+
     setAdminAuthenticated(true);
     showAdminError('');
     showAdminPanel();
     input.value = '';
-    return;
+  } catch (error) {
+    console.error('Admin login request failed:', error);
+    setAdminAuthenticated(false);
+    showAdminError('Admin login service is not available yet. Deploy on Vercel and set ADMIN_PASSWORD in the project environment.');
   }
-
-  setAdminAuthenticated(false);
-  showAdminError('Incorrect admin password.');
 }
 
 function logoutAdmin(){
@@ -265,6 +301,7 @@ function initAdmin(){
 
 if(typeof window !== 'undefined') {
   if(supabase) {
+    setupAdminRealtime();
     syncSupabaseBookings().then(() => initAdmin());
   } else {
     initAdmin();
