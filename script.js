@@ -184,6 +184,22 @@ function toTimeLabel(hour){
   const ampm = normalized < 12 ? "AM" : "PM";
   return `${h12}:00 ${ampm}`;
 }
+function getSelectedHourRange(selectedHours = []){
+  const hours = [...new Set((selectedHours || []).map(Number).filter(Number.isFinite))].sort((a, b) => a - b);
+  if (!hours.length) {
+    return { start: null, endExclusive: null, duration: 0, label: "" };
+  }
+
+  const start = hours[0];
+  const endExclusive = hours[hours.length - 1] + 1;
+  const duration = Math.max(1, endExclusive - start);
+  return {
+    start,
+    endExclusive,
+    duration,
+    label: `${toTimeLabel(start)} – ${toTimeLabel(endExclusive)}`
+  };
+}
 function allTimeSlots(){
   const out = [];
   for(let h = OPEN_HOUR; h < CLOSE_HOUR; h++) out.push(h);
@@ -347,12 +363,10 @@ function updateSelectedSummary(forceHide = false){
   }
 
   const date = wizardState.date || document.getElementById("inputDate").value;
-  const first = wizardState.selectedHours[0];
-  const last = wizardState.selectedHours[wizardState.selectedHours.length - 1] + 1;
-  const rangeLabel = `${toTimeLabel(first)} – ${toTimeLabel(last)}`;
-  wizardState.time = rangeLabel;
+  const range = getSelectedHourRange(wizardState.selectedHours);
+  wizardState.time = range.label;
   summary.hidden = false;
-  text.textContent = `${wizardState.court} · ${formatDateNice(date)} · ${rangeLabel} (${wizardState.selectedHours.length} hr${wizardState.selectedHours.length>1 ? "s" : ""})`;
+  text.textContent = `${wizardState.court} · ${formatDateNice(date)} · ${range.label} (${range.duration} hr${range.duration > 1 ? "s" : ""})`;
 }
 
 function clearSelectedHours(){
@@ -463,10 +477,9 @@ document.getElementById("toStep2Back").addEventListener("click", () => goToStep(
 
 function renderOrderSummary(){
   const box = document.getElementById("orderSummary");
-  const hours = wizardState.selectedHours.length || 0;
-  const start = hours ? wizardState.selectedHours[0] : null;
-  const end = hours ? (wizardState.selectedHours[wizardState.selectedHours.length-1] + 1) : null;
-  const timeLabel = hours ? `${toTimeLabel(start)} – ${toTimeLabel(end)}` : "";
+  const range = getSelectedHourRange(wizardState.selectedHours);
+  const hours = range.duration || 0;
+  const timeLabel = hours ? range.label : "";
   const total = PRICE_PER_HOUR * hours;
   box.innerHTML = `
     <div><span>Name</span><span>${wizardState.name}</span></div>
@@ -512,10 +525,11 @@ document.getElementById("confirmBooking").addEventListener("click", async () => 
     }
   }
 
-  const hours = wizardState.selectedHours.length;
-  const start = wizardState.selectedHours[0];
-  const end = wizardState.selectedHours[wizardState.selectedHours.length-1] + 1;
-  const timeStr = `${toTimeLabel(start)} – ${toTimeLabel(end)}`;
+  const range = getSelectedHourRange(wizardState.selectedHours);
+  const hours = range.duration || 0;
+  const start = range.start;
+  const end = range.endExclusive;
+  const timeStr = range.label;
   const amount = PRICE_PER_HOUR * hours;
 
   let paymentProof = "";
