@@ -85,6 +85,21 @@ function mergeBookingLists(localList = [], remoteList = []){
   });
 }
 async function syncSupabaseBookings(){
+  try {
+    const response = await fetch('/api/bookings', { headers: { 'Cache-Control': 'no-cache' } });
+    if (response.ok) {
+      const data = await response.json().catch(() => null);
+      if (Array.isArray(data)) {
+        const remoteBookings = data.map(normalizeBooking);
+        const merged = mergeBookingLists(getBookings(), remoteBookings);
+        saveBookings(merged);
+        return merged;
+      }
+    }
+  } catch (e) {
+    console.warn('Server booking sync unavailable:', e);
+  }
+
   if(!supabase) return getBookings();
   try{
     const { data, error } = await supabase.from(BOOKINGS_TABLE).select("*").order("created_at", { ascending: false });
