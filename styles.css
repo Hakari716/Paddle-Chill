@@ -316,7 +316,11 @@ main{ max-width:1080px; margin:0 auto; padding:0 24px 80px; }
 .slot-btn:nth-child(3) { animation-delay: 0.15s; }
 .slot-btn:nth-child(n+4) { animation-delay: calc(0.05s * var(--index, 4)); }
 .slot-btn:hover:not(:disabled){ border-color:var(--green-700); background:var(--green-050); transform: translateY(-2px); }
-.slot-btn.selected{ background:var(--green-700); border-color:var(--green-700); color:var(--white); -webkit-text-fill-color:var(--white); transform: scale(1.05); }
+.slot-btn.selected{ background:var(--green-700); border-color:var(--green-700); color:var(--white); -webkit-text-fill-color:var(--white); text-shadow: 0 1px 0 rgba(0,0,0,0.12); transform: scale(1.05); box-shadow: 0 8px 18px rgba(23,92,62,0.25); }
+.slot-btn.selected:active,
+.slot-btn.selected:focus-visible{
+  color:var(--white); -webkit-text-fill-color:var(--white);
+}
 .slot-btn:disabled{
   background:#F1F1EF; color:#B7BDB8; border-color:#E6E7E4;
   cursor:not-allowed; text-decoration:line-through;
