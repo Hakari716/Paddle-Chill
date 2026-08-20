@@ -24,13 +24,21 @@ function setupBookingsRealtime(){
   }, async () => {
     try {
       await syncSupabaseBookings();
-      if (typeof renderCalendar === 'function') renderCalendar();
-      if (typeof renderSheet === 'function') renderSheet();
-      if (typeof showDayDetail === 'function' && wizardState.date) showDayDetail(wizardState.date);
+      refreshScheduleViews();
     } catch (e) {
       console.warn('Realtime booking sync failed:', e);
     }
   }).subscribe();
+}
+
+function refreshScheduleViews(){
+  if (typeof renderCalendar === 'function') renderCalendar();
+  if (typeof renderSheet === 'function') renderSheet();
+  const panel = document.getElementById('dayDetail');
+  const activeDate = (typeof selectedCalendarDate !== 'undefined' && selectedCalendarDate) || wizardState.date;
+  if (typeof showDayDetail === 'function' && panel && !panel.hidden && activeDate) {
+    showDayDetail(activeDate);
+  }
 }
 
 function normalizeBooking(row){
@@ -100,7 +108,7 @@ async function addBooking(booking){
   };
 
   if(supabase){
-    const { data, error } = await supabase.from(BOOKINGS_TABLE).insert([payload]).select();
+    const { data, error } = await supabase.from(BOOKINGS_TABLE).upsert([payload], { onConflict: "id" }).select();
     if(error){
       console.error("Supabase insert error:", error);
       throw new Error(error?.message || "Could not save booking to Supabase.");
@@ -116,12 +124,16 @@ async function addBooking(booking){
   return [booking];
 }
 async function removeBooking(id){
+  if(!id) return;
   if(supabase){
-    const { error } = await supabase.from(BOOKINGS_TABLE).delete().eq("id", id);
+    const { data: removed, error } = await supabase.from(BOOKINGS_TABLE).delete().eq("id", id).select("id");
     if(error){
       console.error("Supabase delete error:", error);
       saveBookings(getBookings().filter(b => b.id !== id));
       return;
+    }
+    if(!removed || removed.length !== 1){
+      console.warn(`Expected to remove 1 booking but removed ${removed ? removed.length : 0}. Check for duplicate ids in the bookings table.`);
     }
   } else {
     saveBookings(getBookings().filter(b => b.id !== id));
@@ -186,7 +198,7 @@ function switchView(key){
   });
   if(key === "schedule") {
     renderCalendar();
-    const focusDate = wizardState.date || todayISO();
+    const focusDate = selectedCalendarDate || wizardState.date || todayISO();
     showDayDetail(focusDate);
   }
   if(key === "sheet") renderSheet();
@@ -197,6 +209,10 @@ if(typeof window !== "undefined") {
     setupBookingsRealtime();
     syncSupabaseBookings();
   }
+  window.addEventListener("storage", (event) => {
+    if(event.key !== STORAGE_KEY) return;
+    refreshScheduleViews();
+  });
 }
 
 let wizardState = {

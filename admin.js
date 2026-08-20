@@ -184,12 +184,16 @@ function renderAdminTable(){
   tbody.querySelectorAll('[data-role="remove-booking"]').forEach(button => {
     button.addEventListener('click', async () => {
       const id = button.dataset.id;
+      if (!id) return;
       if (confirm('Remove this booking?')) {
         if (supabase) {
-          const { error } = await supabase.from(BOOKINGS_TABLE).delete().eq('id', id);
+          const { data: removed, error } = await supabase.from(BOOKINGS_TABLE).delete().eq('id', id).select('id');
           if (error) {
             console.error('Supabase delete error:', error);
             return;
+          }
+          if (!removed || removed.length !== 1) {
+            console.warn(`Expected to remove 1 booking but removed ${removed ? removed.length : 0}. Check for duplicate ids in the bookings table.`);
           }
         }
 
