@@ -53,7 +53,6 @@ function normalizeBooking(row){
   };
 }
 
-
 function getBookings(){
   try{
     return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
@@ -134,7 +133,6 @@ function isHourTaken(court, date, hour){
   return getBookings().some(b => b.court === court && b.date === date && typeof b.hourStart === 'number' && typeof b.hourEnd === 'number' && hour >= b.hourStart && hour < b.hourEnd);
 }
 
-
 function pad(n){ return n.toString().padStart(2,"0"); }
 function toTimeLabel(hour){
   const normalized = ((hour % 24) + 24) % 24;
@@ -176,9 +174,6 @@ function showToast(msg, isError){
   clearTimeout(showToast._timer);
   showToast._timer = setTimeout(() => t.classList.remove("show"), 2800);
 }
-
-
-
 
 const navButtons = document.querySelectorAll(".nav-btn");
 const views = { book: "view-book", schedule: "view-schedule", sheet: "view-sheet" };
@@ -299,7 +294,7 @@ function updateSelectedSummary(forceHide = false){
 
   const date = wizardState.date || document.getElementById("inputDate").value;
   const first = wizardState.selectedHours[0];
-  const last = wizardState.selectedHours[wizardState.selectedHours.length - 1];
+  const last = wizardState.selectedHours[wizardState.selectedHours.length - 1] + 1;
   const rangeLabel = `${toTimeLabel(first)} – ${toTimeLabel(last)}`;
   wizardState.time = rangeLabel;
   summary.hidden = false;
@@ -388,7 +383,6 @@ function resetCourtTimeSelection(){
   document.getElementById("error-2").classList.remove("show");
   renderSlotBoard();
 }
-
 
 document.getElementById("clearSelection").addEventListener("click", resetCourtTimeSelection);
 

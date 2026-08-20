@@ -309,13 +309,14 @@ main{ max-width:1080px; margin:0 auto; padding:0 24px 80px; }
   background:var(--white); color:var(--ink); cursor:pointer; text-align:center;
   transition:all .2s ease; min-height:44px; display:flex; align-items:center; justify-content:center;
   animation: fadeInScale 0.4s ease; animation-fill-mode: backwards;
+  -webkit-appearance:none; appearance:none;
 }
 .slot-btn:nth-child(1) { animation-delay: 0.05s; }
 .slot-btn:nth-child(2) { animation-delay: 0.1s; }
 .slot-btn:nth-child(3) { animation-delay: 0.15s; }
 .slot-btn:nth-child(n+4) { animation-delay: calc(0.05s * var(--index, 4)); }
 .slot-btn:hover:not(:disabled){ border-color:var(--green-700); background:var(--green-050); transform: translateY(-2px); }
-.slot-btn.selected{ background:var(--green-700); border-color:var(--green-700); color:var(--white); transform: scale(1.05); }
+.slot-btn.selected{ background:var(--green-700); border-color:var(--green-700); color:var(--white); -webkit-text-fill-color:var(--white); transform: scale(1.05); }
 .slot-btn:disabled{
   background:#F1F1EF; color:#B7BDB8; border-color:#E6E7E4;
   cursor:not-allowed; text-decoration:line-through;
@@ -629,7 +630,6 @@ main{ max-width:1080px; margin:0 auto; padding:0 24px 80px; }
   font-size: 0.85rem;
 }
 
-
 .sheet-toolbar{
   display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap; align-items:center;
 }
@@ -666,7 +666,6 @@ main{ max-width:1080px; margin:0 auto; padding:0 24px 80px; }
 .remove-btn:hover{ text-decoration:underline; }
 .empty-state{ padding:40px 20px; text-align:center; color:var(--ink-soft); }
 
-
 .payment-qr img{
   width:180px; height:180px; object-fit:contain; background:#fff; border-radius:12px; border:1px solid var(--line-strong);
   box-shadow: 0 8px 20px rgba(0,0,0,0.08);
@@ -677,7 +676,6 @@ main{ max-width:1080px; margin:0 auto; padding:0 24px 80px; }
   border-top:1px solid var(--line);
 }
 
-
 .toast{
   position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px);
   background:var(--ink); color:var(--white); padding:13px 22px; border-radius:8px;
@@ -686,7 +684,6 @@ main{ max-width:1080px; margin:0 auto; padding:0 24px 80px; }
 }
 .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
 .toast.error{ background:var(--danger); }
-
 
 @media (max-width:640px){
   main{ padding:0 16px 60px; }
