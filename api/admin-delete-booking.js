@@ -17,11 +17,16 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, message: 'Booking id is required.' });
     }
 
-    const removed = await supabaseServiceRequest(`bookings?id=eq.${encodeURIComponent(id)}`, {
+    const targetId = String(id).trim();
+    if (!targetId) {
+      return res.status(400).json({ ok: false, message: 'Booking id is required.' });
+    }
+
+    const removed = await supabaseServiceRequest(`bookings?id=eq.${encodeURIComponent(targetId)}`, {
       method: 'DELETE'
     });
 
-    return res.status(200).json({ ok: true, removed: Array.isArray(removed) ? removed.length : 0 });
+    return res.status(200).json({ ok: true, removed: Array.isArray(removed) ? removed.length : 0, deletedId: targetId });
   } catch (error) {
     console.error('Admin delete booking failed:', error);
     return res.status(500).json({ ok: false, message: error.message || 'Could not remove booking.' });

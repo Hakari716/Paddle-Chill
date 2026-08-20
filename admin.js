@@ -59,8 +59,22 @@ function saveBookings(list){
   localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
 }
 
+function mergeBookingLists(localList = [], remoteList = []){
+  const map = new Map();
+  [...localList, ...remoteList].forEach(item => {
+    if (!item || !item.id) return;
+    const existing = map.get(item.id) || {};
+    map.set(item.id, { ...existing, ...item });
+  });
+  return [...map.values()].sort((a, b) => {
+    const aTime = new Date(a.createdAt || 0).getTime();
+    const bTime = new Date(b.createdAt || 0).getTime();
+    return bTime - aTime;
+  });
+}
+
 async function syncSupabaseBookings(){
-  if(!supabase) return [];
+  if(!supabase) return getBookings();
   const { data, error } = await supabase.from(BOOKINGS_TABLE).select('*').order('created_at', { ascending: false });
   if(error){
     console.error('Supabase fetch error:', error);
@@ -68,8 +82,9 @@ async function syncSupabaseBookings(){
   }
 
   const normalized = (data || []).map(normalizeBookingRow);
-  saveBookings(normalized);
-  return normalized;
+  const merged = mergeBookingLists(getBookings(), normalized);
+  saveBookings(merged);
+  return merged;
 }
 
 function formatCurrency(value){
@@ -203,9 +218,12 @@ function renderAdminTable(){
 
   tbody.querySelectorAll('[data-role="remove-booking"]').forEach(button => {
     button.addEventListener('click', async () => {
-      const id = button.dataset.id;
-      if (!id) return;
-      if (confirm('Remove this booking?')) {
+      const id = String(button.dataset.id || '').trim();
+      if (!id || button.disabled) return;
+      if (!confirm('Remove this booking?')) return;
+
+      button.disabled = true;
+      try {
         const response = await fetch('/api/admin-delete-booking', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -221,15 +239,12 @@ function renderAdminTable(){
           return;
         }
 
-        const saved = getBookings();
-        saveBookings(saved.filter(item => item.id !== id));
-
-        const refreshed = await syncSupabaseBookings();
-        if (refreshed && Array.isArray(refreshed)) {
-          saveBookings(refreshed.filter(item => item.id !== id));
-        }
-
+        const saved = getBookings().filter(item => String(item.id) !== id);
+        saveBookings(saved);
+        await syncSupabaseBookings();
         renderAdminTable();
+      } finally {
+        button.disabled = false;
       }
     });
   });

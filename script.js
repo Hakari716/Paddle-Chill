@@ -71,17 +71,31 @@ function getBookings(){
 function saveBookings(list){
   localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
 }
+function mergeBookingLists(localList = [], remoteList = []){
+  const map = new Map();
+  [...localList, ...remoteList].forEach(item => {
+    if (!item || !item.id) return;
+    const existing = map.get(item.id) || {};
+    map.set(item.id, { ...existing, ...item });
+  });
+  return [...map.values()].sort((a, b) => {
+    const aTime = new Date(a.createdAt || 0).getTime();
+    const bTime = new Date(b.createdAt || 0).getTime();
+    return bTime - aTime;
+  });
+}
 async function syncSupabaseBookings(){
-  if(!supabase) return;
+  if(!supabase) return getBookings();
   try{
     const { data, error } = await supabase.from(BOOKINGS_TABLE).select("*").order("created_at", { ascending: false });
     if(error){
       console.error("Supabase fetch error:", error);
-      return;
+      return getBookings();
     }
-    const normalized = (data || []).map(normalizeBooking);
-    saveBookings(normalized);
-    return normalized;
+    const remoteBookings = (data || []).map(normalizeBooking);
+    const merged = mergeBookingLists(getBookings(), remoteBookings);
+    saveBookings(merged);
+    return merged;
   }catch(e){
     console.warn("Supabase sync skipped:", e);
     return getBookings();
@@ -125,18 +139,21 @@ async function addBooking(booking){
 }
 async function removeBooking(id){
   if(!id) return;
+  const targetId = String(id).trim();
+  if(!targetId) return;
+
   if(supabase){
-    const { data: removed, error } = await supabase.from(BOOKINGS_TABLE).delete().eq("id", id).select("id");
+    const { data: removed, error } = await supabase.from(BOOKINGS_TABLE).delete().eq("id", targetId).select("id");
     if(error){
       console.error("Supabase delete error:", error);
-      saveBookings(getBookings().filter(b => b.id !== id));
+      saveBookings(getBookings().filter(b => String(b.id) !== targetId));
       return;
     }
     if(!removed || removed.length !== 1){
       console.warn(`Expected to remove 1 booking but removed ${removed ? removed.length : 0}. Check for duplicate ids in the bookings table.`);
     }
   } else {
-    saveBookings(getBookings().filter(b => b.id !== id));
+    saveBookings(getBookings().filter(b => String(b.id) !== targetId));
   }
 
   await syncSupabaseBookings();
@@ -212,6 +229,12 @@ if(typeof window !== "undefined") {
   window.addEventListener("storage", (event) => {
     if(event.key !== STORAGE_KEY) return;
     refreshScheduleViews();
+  });
+  window.addEventListener("focus", async () => {
+    if (supabase) {
+      await syncSupabaseBookings();
+      refreshScheduleViews();
+    }
   });
 }
 
