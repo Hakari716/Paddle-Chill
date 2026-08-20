@@ -7,6 +7,7 @@ if (supabase && !window.__paddleSupabaseClient) {
 
 const STORAGE_KEY = 'paddle_chill_bookings';
 const ADMIN_KEY = 'paddle_chill_admin';
+const ADMIN_TOKEN_KEY = 'paddle_chill_admin_token';
 const BOOKINGS_TABLE = 'bookings';
 let adminRealtimeChannel = null;
 
@@ -89,6 +90,18 @@ function setAdminAuthenticated(value){
   localStorage.setItem(ADMIN_KEY, value ? 'true' : 'false');
 }
 
+function getAdminToken(){
+  return localStorage.getItem(ADMIN_TOKEN_KEY) || '';
+}
+
+function setAdminToken(token){
+  if (token) {
+    localStorage.setItem(ADMIN_TOKEN_KEY, token);
+  } else {
+    localStorage.removeItem(ADMIN_TOKEN_KEY);
+  }
+}
+
 function showAdminError(message){
   const el = document.getElementById('adminError');
   if (!el) return;
@@ -166,12 +179,19 @@ function renderAdminTable(){
       if (!booking) return;
       const nextStatus = booking.status === 'Confirmed' ? 'Pending' : 'Confirmed';
 
-      if (supabase) {
-        const { error } = await supabase.from(BOOKINGS_TABLE).update({ status: nextStatus }).eq('id', booking.id);
-        if (error) {
-          console.error('Supabase update error:', error);
-          return;
+      const response = await fetch('/api/admin-update-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: booking.id, status: nextStatus, token: getAdminToken() })
+      });
+      const result = await response.json().catch(() => ({ ok: false }));
+
+      if (!response.ok || !result.ok) {
+        if (response.status === 401) {
+          logoutAdmin();
         }
+        console.error('Admin update error:', result.message);
+        return;
       }
 
       booking.status = nextStatus;
@@ -186,15 +206,19 @@ function renderAdminTable(){
       const id = button.dataset.id;
       if (!id) return;
       if (confirm('Remove this booking?')) {
-        if (supabase) {
-          const { data: removed, error } = await supabase.from(BOOKINGS_TABLE).delete().eq('id', id).select('id');
-          if (error) {
-            console.error('Supabase delete error:', error);
-            return;
+        const response = await fetch('/api/admin-delete-booking', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, token: getAdminToken() })
+        });
+        const result = await response.json().catch(() => ({ ok: false }));
+
+        if (!response.ok || !result.ok) {
+          if (response.status === 401) {
+            logoutAdmin();
           }
-          if (!removed || removed.length !== 1) {
-            console.warn(`Expected to remove 1 booking but removed ${removed ? removed.length : 0}. Check for duplicate ids in the bookings table.`);
-          }
+          console.error('Admin delete error:', result.message);
+          return;
         }
 
         const saved = getBookings();
@@ -244,23 +268,27 @@ async function loginAdmin(event){
 
     if (!response.ok || !result.ok) {
       setAdminAuthenticated(false);
+      setAdminToken('');
       showAdminError(result.message || 'Incorrect admin password.');
       return;
     }
 
     setAdminAuthenticated(true);
+    setAdminToken(result.token || '');
     showAdminError('');
     showAdminPanel();
     input.value = '';
   } catch (error) {
     console.error('Admin login request failed:', error);
     setAdminAuthenticated(false);
+    setAdminToken('');
     showAdminError('Admin login service is not available yet. Deploy on Vercel and set ADMIN_PASSWORD in the project environment.');
   }
 }
 
 function logoutAdmin(){
   setAdminAuthenticated(false);
+  setAdminToken('');
   showLoginPanel();
 }
 

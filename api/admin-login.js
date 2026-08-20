@@ -1,3 +1,5 @@
+import { createAdminToken } from './_auth.js';
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ ok: false, message: 'Method not allowed.' });
@@ -18,7 +20,8 @@ export default async function handler(req, res) {
       return res.status(401).json({ ok: false, message: 'Incorrect admin password.' });
     }
 
-    return res.status(200).json({ ok: true, message: 'Admin authenticated.' });
+    const token = createAdminToken();
+    return res.status(200).json({ ok: true, message: 'Admin authenticated.', token });
   } catch (error) {
     console.error('Admin login request failed:', error);
     return res.status(500).json({ ok: false, message: 'Admin login failed.' });
