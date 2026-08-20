@@ -296,6 +296,7 @@ function initAdmin(){
   const loginForm = document.getElementById('loginForm');
   const logoutBtn = document.getElementById('logoutBtn');
   const searchInput = document.getElementById('adminSearch');
+  const refreshBtn = document.getElementById('refreshBookings');
   const closeBtn = document.getElementById('closeProofLightbox');
   const lightbox = document.getElementById('proofLightbox');
 
@@ -309,6 +310,15 @@ function initAdmin(){
 
   if (searchInput) {
     searchInput.addEventListener('input', renderAdminTable);
+  }
+
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', async () => {
+      refreshBtn.disabled = true;
+      await syncSupabaseBookings();
+      renderAdminTable();
+      refreshBtn.disabled = false;
+    });
   }
 
   if (closeBtn && lightbox) {
@@ -338,6 +348,16 @@ if(typeof window !== 'undefined') {
   } else {
     initAdmin();
   }
+
+  setInterval(async () => {
+    if (!isAdminAuthenticated()) return;
+    try {
+      await syncSupabaseBookings();
+      renderAdminTable();
+    } catch (e) {
+      console.warn('Admin polling sync failed:', e);
+    }
+  }, 6000);
 } else {
   initAdmin();
 }
