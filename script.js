@@ -96,11 +96,11 @@ async function syncSupabaseBookings(){
       const data = await response.json().catch(() => null);
       if (Array.isArray(data)) {
         const remoteBookings = data.map(normalizeBooking);
-        const merged = mergeBookingLists(localBookings, remoteBookings);
         if (remoteBookings.length || !localBookings.length) {
-          saveBookings(merged);
+          saveBookings(remoteBookings);
+          return remoteBookings;
         }
-        return merged;
+        return localBookings;
       }
     }
   } catch (e) {
@@ -115,11 +115,11 @@ async function syncSupabaseBookings(){
       return localBookings;
     }
     const remoteBookings = (data || []).map(normalizeBooking);
-    const merged = mergeBookingLists(localBookings, remoteBookings);
     if (remoteBookings.length || !localBookings.length) {
-      saveBookings(merged);
+      saveBookings(remoteBookings);
+      return remoteBookings;
     }
-    return merged;
+    return localBookings;
   }catch(e){
     console.warn("Supabase sync skipped:", e);
     return localBookings;
