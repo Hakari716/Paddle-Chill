@@ -31,19 +31,22 @@ function setupAdminRealtime(){
 function normalizeBookingRow(row) {
   const hourStart = Number(row.start_hour ?? row.hourStart ?? 0);
   const hourEnd = Number(row.end_hour ?? row.hourEnd ?? ((hourStart || 0) + (Number(row.duration) || 1)));
+  const bookingDate = row.booking_date ?? row.date ?? '';
+  const customerName = row.customer_name ?? row.name ?? '';
+  const paymentMethod = row.payment_method ?? row.payment ?? 'Cash on arrival';
 
   return {
     id: row.id,
-    name: row.customer_name || '',
+    name: customerName,
     phone: row.phone || '',
     court: row.court,
-    date: row.booking_date,
+    date: bookingDate,
     time: row.time || '',
-    payment: row.payment_method || 'Cash on arrival',
-    amount: Number(row.amount || 0),
+    payment: paymentMethod,
+    amount: Number(row.amount ?? row.total ?? 0),
     status: row.status || 'Pending',
-    paymentProof: row.payment_proof_url || '',
-    paymentProofName: row.payment_proof_name || '',
+    paymentProof: row.payment_proof_url ?? row.paymentProof ?? '',
+    paymentProofName: row.payment_proof_name ?? row.paymentProofName ?? '',
     hourStart: Number.isFinite(hourStart) ? hourStart : 0,
     hourEnd: Number.isFinite(hourEnd) ? hourEnd : hourStart || 0,
     duration: Number(row.duration) || 1

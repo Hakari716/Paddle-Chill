@@ -43,21 +43,24 @@ function refreshScheduleViews(){
 
 function normalizeBooking(row){
   const hourStart = Number(row.start_hour ?? row.hourStart ?? 0);
-  const hourEnd = Number(row.end_hour ?? row.hourEnd ?? ((hourStart || 0) + (Number(row.duration) || 1)));
+  const hourEnd = Number(row.end_hour ?? row.endHour ?? row.hourEnd ?? ((hourStart || 0) + (Number(row.duration) || 1)));
+  const bookingDate = row.booking_date ?? row.date ?? "";
+  const customerName = row.customer_name ?? row.name ?? "";
+  const paymentMethod = row.payment_method ?? row.payment ?? "Cash on arrival";
 
   return {
     id: row.id,
-    name: row.customer_name || row.name || "",
+    name: customerName,
     phone: row.phone || "",
     court: row.court,
-    date: row.booking_date || row.date,
+    date: bookingDate,
     time: row.time || "",
     hourStart: Number.isFinite(hourStart) ? hourStart : 0,
     hourEnd: Number.isFinite(hourEnd) ? hourEnd : hourStart || 0,
     duration: Number(row.duration) || 1,
-    payment: row.payment_method || row.payment || "Cash on arrival",
-    paymentProof: row.payment_proof_url || row.paymentProof || "",
-    paymentProofName: row.payment_proof_name || row.paymentProofName || "",
+    payment: paymentMethod,
+    paymentProof: row.payment_proof_url ?? row.paymentProof ?? "",
+    paymentProofName: row.payment_proof_name ?? row.paymentProofName ?? "",
     amount: Number(row.amount ?? row.total ?? 0),
     status: row.status || "Pending",
     createdAt: row.created_at || row.createdAt || new Date().toISOString()
