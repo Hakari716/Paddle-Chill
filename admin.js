@@ -273,10 +273,43 @@ function renderAdminTable(){
   });
 }
 
+async function loadAdminBookings(){
+  try {
+    const response = await fetch('/api/bookings', { headers: { 'Cache-Control': 'no-cache' } });
+    if (!response.ok) {
+      const cached = getBookings();
+      if (Array.isArray(cached) && cached.length) {
+        saveBookings(cached);
+        renderAdminTable();
+      }
+      return;
+    }
+
+    const data = await response.json().catch(() => null);
+    if (!Array.isArray(data)) {
+      const cached = getBookings();
+      if (Array.isArray(cached) && cached.length) {
+        renderAdminTable();
+      }
+      return;
+    }
+
+    const normalized = data.map(normalizeBookingRow);
+    saveBookings(normalized);
+    renderAdminTable();
+  } catch (error) {
+    console.warn('Failed to load admin bookings:', error);
+    const cached = getBookings();
+    if (Array.isArray(cached) && cached.length) {
+      renderAdminTable();
+    }
+  }
+}
+
 function showAdminPanel(){
   document.getElementById('loginScreen').classList.add('admin-hidden');
   document.getElementById('adminScreen').classList.remove('admin-hidden');
-  renderAdminTable();
+  loadAdminBookings();
 }
 
 function showLoginPanel(){
@@ -315,6 +348,7 @@ async function loginAdmin(event){
     setAdminToken(result.token || '');
     showAdminError('');
     showAdminPanel();
+    await loadAdminBookings();
     input.value = '';
   } catch (error) {
     console.error('Admin login request failed:', error);
@@ -353,8 +387,7 @@ function initAdmin(){
   if (refreshBtn) {
     refreshBtn.addEventListener('click', async () => {
       refreshBtn.disabled = true;
-      await syncSupabaseBookings();
-      renderAdminTable();
+      await loadAdminBookings();
       refreshBtn.disabled = false;
     });
   }
@@ -380,31 +413,16 @@ function initAdmin(){
 }
 
 if(typeof window !== 'undefined') {
-  async function bootstrapAdmin(){
-    try {
-      const serverBookings = await syncSupabaseBookings();
-      if (Array.isArray(serverBookings) && serverBookings.length) {
-        saveBookings(serverBookings);
-      }
-    } catch (error) {
-      console.warn('Admin bootstrap sync failed:', error);
-    }
-    initAdmin();
-    if (supabase) {
-      setupAdminRealtime();
-    }
-  }
+  initAdmin();
 
-  bootstrapAdmin();
+  if (supabase) {
+    setupAdminRealtime();
+  }
 
   setInterval(async () => {
     if (!isAdminAuthenticated()) return;
     try {
-      const liveBookings = await syncSupabaseBookings();
-      if (Array.isArray(liveBookings) && liveBookings.length) {
-        saveBookings(liveBookings);
-      }
-      renderAdminTable();
+      await loadAdminBookings();
     } catch (e) {
       console.warn('Admin polling sync failed:', e);
     }
