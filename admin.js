@@ -157,7 +157,8 @@ function renderStats(bookings){
 function renderAdminTable(){
   const searchTerm = (document.getElementById('adminSearch')?.value || '').toLowerCase();
   const tbody = document.getElementById('adminTableBody');
-  const bookings = getBookings().slice().sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
+  const latestBookings = getBookings();
+  const bookings = latestBookings.slice().sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
 
   const filtered = bookings.filter((b) => {
     const haystack = `${b.name} ${b.phone} ${b.court} ${b.date} ${b.time} ${b.payment}`.toLowerCase();
@@ -379,17 +380,30 @@ function initAdmin(){
 }
 
 if(typeof window !== 'undefined') {
-  if(supabase) {
-    setupAdminRealtime();
-    syncSupabaseBookings().then(() => initAdmin());
-  } else {
+  async function bootstrapAdmin(){
+    try {
+      const serverBookings = await syncSupabaseBookings();
+      if (Array.isArray(serverBookings) && serverBookings.length) {
+        saveBookings(serverBookings);
+      }
+    } catch (error) {
+      console.warn('Admin bootstrap sync failed:', error);
+    }
     initAdmin();
+    if (supabase) {
+      setupAdminRealtime();
+    }
   }
+
+  bootstrapAdmin();
 
   setInterval(async () => {
     if (!isAdminAuthenticated()) return;
     try {
-      await syncSupabaseBookings();
+      const liveBookings = await syncSupabaseBookings();
+      if (Array.isArray(liveBookings) && liveBookings.length) {
+        saveBookings(liveBookings);
+      }
       renderAdminTable();
     } catch (e) {
       console.warn('Admin polling sync failed:', e);
