@@ -29,6 +29,9 @@ function setupAdminRealtime(){
 }
 
 function normalizeBookingRow(row) {
+  const hourStart = Number(row.start_hour ?? row.hourStart ?? 0);
+  const hourEnd = Number(row.end_hour ?? row.hourEnd ?? ((hourStart || 0) + (Number(row.duration) || 1)));
+
   return {
     id: row.id,
     name: row.customer_name || '',
@@ -41,9 +44,9 @@ function normalizeBookingRow(row) {
     status: row.status || 'Pending',
     paymentProof: row.payment_proof_url || '',
     paymentProofName: row.payment_proof_name || '',
-    hourStart: row.start_hour,
-    hourEnd: row.end_hour,
-    duration: row.duration
+    hourStart: Number.isFinite(hourStart) ? hourStart : 0,
+    hourEnd: Number.isFinite(hourEnd) ? hourEnd : hourStart || 0,
+    duration: Number(row.duration) || 1
   };
 }
 

@@ -42,6 +42,9 @@ function refreshScheduleViews(){
 }
 
 function normalizeBooking(row){
+  const hourStart = Number(row.start_hour ?? row.hourStart ?? 0);
+  const hourEnd = Number(row.end_hour ?? row.hourEnd ?? ((hourStart || 0) + (Number(row.duration) || 1)));
+
   return {
     id: row.id,
     name: row.customer_name || row.name || "",
@@ -49,9 +52,9 @@ function normalizeBooking(row){
     court: row.court,
     date: row.booking_date || row.date,
     time: row.time || "",
-    hourStart: row.start_hour ?? row.hourStart,
-    hourEnd: row.end_hour ?? row.hourEnd,
-    duration: row.duration || 1,
+    hourStart: Number.isFinite(hourStart) ? hourStart : 0,
+    hourEnd: Number.isFinite(hourEnd) ? hourEnd : hourStart || 0,
+    duration: Number(row.duration) || 1,
     payment: row.payment_method || row.payment || "Cash on arrival",
     paymentProof: row.payment_proof_url || row.paymentProof || "",
     paymentProofName: row.payment_proof_name || row.paymentProofName || "",
@@ -179,8 +182,20 @@ async function removeBooking(id){
 
   await syncSupabaseBookings();
 }
+function getBookingHourRange(booking){
+  const start = Number(booking?.hourStart ?? 0);
+  const end = Number(booking?.hourEnd ?? ((start || 0) + (Number(booking?.duration) || 1)));
+  return {
+    start: Number.isFinite(start) ? start : 0,
+    end: Number.isFinite(end) ? end : start || 0
+  };
+}
 function isHourTaken(court, date, hour){
-  return getBookings().some(b => b.court === court && b.date === date && typeof b.hourStart === 'number' && typeof b.hourEnd === 'number' && hour >= b.hourStart && hour < b.hourEnd);
+  return getBookings().some((b) => {
+    if (b.court !== court || b.date !== date) return false;
+    const { start, end } = getBookingHourRange(b);
+    return hour >= start && hour < end;
+  });
 }
 
 function pad(n){ return n.toString().padStart(2,"0"); }
@@ -727,7 +742,11 @@ function showDayDetail(iso){
     html += `<div class="time-column">
               <div class="time-header">${time}</div>`;
     COURTS.forEach(court => {
-      const booking = getBookings().find(b => b.court === court && b.date === iso && typeof b.hourStart === 'number' && hour >= b.hourStart && hour < b.hourEnd);
+      const booking = getBookings().find((b) => {
+        if (b.court !== court || b.date !== iso) return false;
+        const { start, end } = getBookingHourRange(b);
+        return hour >= start && hour < end;
+      });
       if(booking) {
         html += `<div class="slot-card booked">
                   <div class="slot-court">${court}</div>
