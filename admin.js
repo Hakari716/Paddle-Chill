@@ -74,30 +74,38 @@ function mergeBookingLists(localList = [], remoteList = []){
 }
 
 async function syncSupabaseBookings(){
+  const localBookings = getBookings();
+
   try {
     const response = await fetch('/api/bookings', { headers: { 'Cache-Control': 'no-cache' } });
     if (response.ok) {
       const data = await response.json().catch(() => null);
       if (Array.isArray(data)) {
         const normalized = data.map(normalizeBookingRow);
-        saveBookings(normalized);
-        return normalized;
+        const merged = mergeBookingLists(localBookings, normalized);
+        if (normalized.length || !localBookings.length) {
+          saveBookings(merged);
+        }
+        return merged;
       }
     }
   } catch (error) {
     console.warn('Admin booking server sync unavailable:', error);
   }
 
-  if(!supabase) return getBookings();
+  if(!supabase) return localBookings;
   const { data, error } = await supabase.from(BOOKINGS_TABLE).select('*').order('created_at', { ascending: false });
   if(error){
     console.error('Supabase fetch error:', error);
-    return getBookings();
+    return localBookings;
   }
 
   const normalized = (data || []).map(normalizeBookingRow);
-  saveBookings(normalized);
-  return normalized;
+  const merged = mergeBookingLists(localBookings, normalized);
+  if (normalized.length || !localBookings.length) {
+    saveBookings(merged);
+  }
+  return merged;
 }
 
 function formatCurrency(value){

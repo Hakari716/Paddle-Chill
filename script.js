@@ -85,33 +85,41 @@ function mergeBookingLists(localList = [], remoteList = []){
   });
 }
 async function syncSupabaseBookings(){
+  const localBookings = getBookings();
+
   try {
     const response = await fetch('/api/bookings', { headers: { 'Cache-Control': 'no-cache' } });
     if (response.ok) {
       const data = await response.json().catch(() => null);
       if (Array.isArray(data)) {
         const remoteBookings = data.map(normalizeBooking);
-        saveBookings(remoteBookings);
-        return remoteBookings;
+        const merged = mergeBookingLists(localBookings, remoteBookings);
+        if (remoteBookings.length || !localBookings.length) {
+          saveBookings(merged);
+        }
+        return merged;
       }
     }
   } catch (e) {
     console.warn('Server booking sync unavailable:', e);
   }
 
-  if(!supabase) return getBookings();
+  if(!supabase) return localBookings;
   try{
     const { data, error } = await supabase.from(BOOKINGS_TABLE).select("*").order("created_at", { ascending: false });
     if(error){
       console.error("Supabase fetch error:", error);
-      return getBookings();
+      return localBookings;
     }
     const remoteBookings = (data || []).map(normalizeBooking);
-    saveBookings(remoteBookings);
-    return remoteBookings;
+    const merged = mergeBookingLists(localBookings, remoteBookings);
+    if (remoteBookings.length || !localBookings.length) {
+      saveBookings(merged);
+    }
+    return merged;
   }catch(e){
     console.warn("Supabase sync skipped:", e);
-    return getBookings();
+    return localBookings;
   }
 }
 async function addBooking(booking){
