@@ -116,8 +116,22 @@ function formatCurrency(value){
 }
 
 function formatDateNice(iso){
-  const [y,m,d] = iso.split('-').map(Number);
-  const dt = new Date(y, m-1, d);
+  if (!iso || typeof iso !== 'string') return 'Date unavailable';
+
+  const candidate = String(iso).trim();
+  if (!candidate) return 'Date unavailable';
+
+  const cleanDate = candidate.includes('T') ? candidate.split('T')[0] : candidate;
+  const [y, m, d] = cleanDate.split('-').map(Number);
+
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) {
+    const dt = new Date(candidate);
+    if (Number.isNaN(dt.getTime())) return 'Date unavailable';
+    return dt.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  }
+
+  const dt = new Date(y, m - 1, d);
+  if (Number.isNaN(dt.getTime())) return 'Date unavailable';
   return dt.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 }
 
@@ -181,9 +195,9 @@ function renderAdminTable(){
       <td>${b.name}</td>
       <td>${b.phone}</td>
       <td>${b.court}</td>
-      <td>${formatDateNice(b.date)}</td>
-      <td>${b.time}</td>
-      <td>${b.payment}</td>
+      <td>${formatDateNice(b.date || b.booking_date)}</td>
+      <td>${b.time || '—'}</td>
+      <td>${b.payment || 'Cash on arrival'}</td>
       <td>
         ${b.paymentProof ? `<img class="proof-thumb" src="${b.paymentProof}" alt="${b.paymentProofName || 'Payment proof'}" data-role="view-proof" data-proof="${encodeURIComponent(b.paymentProof)}" />` : `<span class="proof-empty">—</span>`}
       </td>
