@@ -80,9 +80,8 @@ async function syncSupabaseBookings(){
       const data = await response.json().catch(() => null);
       if (Array.isArray(data)) {
         const normalized = data.map(normalizeBookingRow);
-        const merged = mergeBookingLists(getBookings(), normalized);
-        saveBookings(merged);
-        return merged;
+        saveBookings(normalized);
+        return normalized;
       }
     }
   } catch (error) {
@@ -97,9 +96,8 @@ async function syncSupabaseBookings(){
   }
 
   const normalized = (data || []).map(normalizeBookingRow);
-  const merged = mergeBookingLists(getBookings(), normalized);
-  saveBookings(merged);
-  return merged;
+  saveBookings(normalized);
+  return normalized;
 }
 
 function formatCurrency(value){
@@ -254,8 +252,6 @@ function renderAdminTable(){
           return;
         }
 
-        const saved = getBookings().filter(item => String(item.id) !== id);
-        saveBookings(saved);
         await syncSupabaseBookings();
         renderAdminTable();
       } finally {

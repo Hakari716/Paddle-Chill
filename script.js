@@ -91,9 +91,8 @@ async function syncSupabaseBookings(){
       const data = await response.json().catch(() => null);
       if (Array.isArray(data)) {
         const remoteBookings = data.map(normalizeBooking);
-        const merged = mergeBookingLists(getBookings(), remoteBookings);
-        saveBookings(merged);
-        return merged;
+        saveBookings(remoteBookings);
+        return remoteBookings;
       }
     }
   } catch (e) {
@@ -108,9 +107,8 @@ async function syncSupabaseBookings(){
       return getBookings();
     }
     const remoteBookings = (data || []).map(normalizeBooking);
-    const merged = mergeBookingLists(getBookings(), remoteBookings);
-    saveBookings(merged);
-    return merged;
+    saveBookings(remoteBookings);
+    return remoteBookings;
   }catch(e){
     console.warn("Supabase sync skipped:", e);
     return getBookings();
