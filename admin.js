@@ -1,8 +1,14 @@
-const supabaseUrl = "https://pkmymaxxbqacotuxiftk.supabase.co";
-const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBrbXltYXh4YnFhY290dXhpZnRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY1MzM1NTMsImV4cCI6MjEwMjEwOTU1M30.PBdkVqsOwJu6esrWrn0_GaYfTi2vrASMPKSnAMZzPvs";
-var supabase = window.__paddleSupabaseClient || (window.supabase ? window.supabase.createClient(supabaseUrl, supabaseAnonKey) : null);
+const appConfig = window.__APP_CONFIG__ || {};
+const supabaseUrl = appConfig.supabaseUrl || "";
+const supabaseAnonKey = appConfig.supabaseAnonKey || "";
+var supabase = window.__paddleSupabaseClient || (
+  window.supabase && supabaseUrl && supabaseAnonKey ? window.supabase.createClient(supabaseUrl, supabaseAnonKey) : null
+);
 if (supabase && !window.__paddleSupabaseClient) {
   window.__paddleSupabaseClient = supabase;
+}
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn("Public Supabase config is missing. Add window.__APP_CONFIG__ or config.js with the public URL and anon key.");
 }
 
 const STORAGE_KEY = 'paddle_chill_bookings';
@@ -33,7 +39,7 @@ function normalizeBookingRow(row) {
   const hourEnd = Number(row.end_hour ?? row.hourEnd ?? ((hourStart || 0) + (Number(row.duration) || 1)));
   const bookingDate = row.booking_date ?? row.date ?? '';
   const customerName = row.customer_name ?? row.name ?? '';
-  const paymentMethod = row.payment_method ?? row.payment ?? 'Cash on arrival';
+  const paymentMethod = row.payment_method ?? row.payment ?? 'GCash';
 
   return {
     id: row.id,
@@ -166,15 +172,16 @@ function showAdminError(message){
 }
 
 function renderStats(bookings){
-  document.getElementById('statTotal').textContent = bookings.length;
-  document.getElementById('statConfirmed').textContent = bookings.filter(b => b.status === 'Confirmed').length;
-  document.getElementById('statPending').textContent = bookings.filter(b => b.status === 'Pending').length;
+  const visibleBookings = (bookings || []).filter(b => String(b.status || '').trim() !== 'Cancelled');
+  document.getElementById('statTotal').textContent = visibleBookings.length;
+  document.getElementById('statConfirmed').textContent = visibleBookings.filter(b => b.status === 'Confirmed').length;
+  document.getElementById('statPending').textContent = visibleBookings.filter(b => b.status === 'Pending').length;
 }
 
 function renderAdminTable(){
   const searchTerm = (document.getElementById('adminSearch')?.value || '').toLowerCase();
   const tbody = document.getElementById('adminTableBody');
-  const latestBookings = getBookings();
+  const latestBookings = getBookings().filter(b => String(b.status || '').trim() !== 'Cancelled');
   const bookings = latestBookings.slice().sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
 
   const filtered = bookings.filter((b) => {
@@ -211,7 +218,7 @@ function renderAdminTable(){
           <button class="admin-table-action" type="button" data-role="toggle-status" data-id="${b.id}">
             ${b.status === 'Confirmed' ? 'Mark pending' : 'Mark confirmed'}
           </button>
-          <button class="admin-remove-btn" type="button" data-role="remove-booking" data-id="${b.id}">Remove</button>
+          <button class="admin-remove-btn" type="button" data-role="remove-booking" data-id="${b.id}" title="Move booking to bin" aria-label="Move booking to bin">Move to bin</button>
         </div>
       </td>
     </tr>
@@ -262,7 +269,7 @@ function renderAdminTable(){
     button.addEventListener('click', async () => {
       const id = String(button.dataset.id || '').trim();
       if (!id || button.disabled) return;
-      if (!confirm('Remove this booking?')) return;
+      if (!confirm('Move this booking to bin? It will stay in the system but be hidden from active bookings.')) return;
 
       button.disabled = true;
       try {
@@ -281,6 +288,8 @@ function renderAdminTable(){
           return;
         }
 
+        const existing = getBookings();
+        saveBookings(existing.map(item => item.id === id ? { ...item, status: 'Cancelled' } : item));
         await syncSupabaseBookings();
         renderAdminTable();
       } finally {

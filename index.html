@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
+<script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -108,13 +109,7 @@
           <div class="pay-options">
             <label class="pay-option">
               <div class="pay-option-row">
-                <input type="radio" name="payMethod" value="Cash on arrival" checked>
-                <span>Cash on arrival</span>
-              </div>
-            </label>
-            <label class="pay-option">
-              <div class="pay-option-row">
-                <input type="radio" name="payMethod" value="GCash">
+                <input type="radio" name="payMethod" value="GCash" checked>
                 <span>GCash</span>
               </div>
               <div class="payment-qr" hidden data-method="GCash">
@@ -149,6 +144,9 @@
               </div>
             </label>
           </div>
+          <p class="pricing-note">Rates: 6:00 AM onward = ₱150 per hour. 6:00 PM onward = ₱250 per hour.</p>
+          <p class="pricing-note">We allow 50% down payment.</p>
+          <div id="paymentMethodNote" class="payment-method-note" hidden>This payment method is not available.</div>
         </div>
 
         <div class="field-error" id="error-3"></div>

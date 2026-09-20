@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
+  <script src="config.js"></script>
   <style>
     :root {
       --green-900:#0E2F22;
@@ -187,19 +188,24 @@
       transform: translateY(-1px);
     }
     .admin-remove-btn {
-      background: none;
-      border: none;
+      background: rgba(140, 47, 30, 0.05);
+      border: 1px solid rgba(140, 47, 30, 0.25);
       color: var(--danger);
       cursor: pointer;
-      font-size: 0.82rem;
+      font-size: 0.76rem;
       font-family: var(--font-body);
-      font-weight: 600;
-      padding: 7px 8px;
+      font-weight: 700;
+      padding: 7px 10px;
       border-radius: 6px;
       line-height: 1.2;
       white-space: nowrap;
+      transition: all 0.2s ease;
     }
-    .admin-remove-btn:hover { text-decoration: underline; }
+    .admin-remove-btn:hover {
+      background: rgba(140, 47, 30, 0.1);
+      text-decoration: none;
+      transform: translateY(-1px);
+    }
 
     .status-pill {
       display: inline-block;

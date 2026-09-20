@@ -1,18 +1,41 @@
-const supabaseUrl = "https://pkmymaxxbqacotuxiftk.supabase.co";
-const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBrbXltYXh4YnFhY290dXhpZnRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY1MzM1NTMsImV4cCI6MjEwMjEwOTU1M30.PBdkVqsOwJu6esrWrn0_GaYfTi2vrASMPKSnAMZzPvs";
-var supabase = window.__paddleSupabaseClient || (window.supabase ? window.supabase.createClient(supabaseUrl, supabaseAnonKey) : null);
+const appConfig = window.__APP_CONFIG__ || {};
+const supabaseUrl = appConfig.supabaseUrl || "";
+const supabaseAnonKey = appConfig.supabaseAnonKey || "";
+var supabase = window.__paddleSupabaseClient || (
+  window.supabase && supabaseUrl && supabaseAnonKey ? window.supabase.createClient(supabaseUrl, supabaseAnonKey) : null
+);
 if (supabase && !window.__paddleSupabaseClient) {
   window.__paddleSupabaseClient = supabase;
+}
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn("Public Supabase config is missing. Add window.__APP_CONFIG__ or config.js with the public URL and anon key.");
 }
 
 const COURTS = ["Court 1", "Court 2"];
 const OPEN_HOUR = 0;          
 const CLOSE_HOUR = 24;        
-const PRICE_PER_HOUR = 250;   
+const PRICE_PER_HOUR = 150;
+const EVENING_PRICE_PER_HOUR = 250;
 const CURRENCY = "₱";
 const STORAGE_KEY = "paddle_chill_bookings";
 const BOOKINGS_TABLE = "bookings";
 let bookingsRealtimeChannel = null;
+
+function isBookingVisible(item){
+  if (!item) return false;
+  const status = String(item.status || '').trim();
+  return status !== 'Cancelled' && !item.is_deleted && !item.deleted && !item.deleted_at;
+}
+
+function getHourlyRateForHour(hour){
+  const numericHour = Number(hour);
+  return Number.isFinite(numericHour) && numericHour >= 18 ? EVENING_PRICE_PER_HOUR : PRICE_PER_HOUR;
+}
+
+function calculateBookingTotalFromSelectedHours(selectedHours = []){
+  const uniqueHours = [...new Set((selectedHours || []).map(Number).filter(Number.isFinite))];
+  return uniqueHours.reduce((sum, hour) => sum + getHourlyRateForHour(hour), 0);
+}
 
 function setupBookingsRealtime(){
   if(!supabase || !supabase.channel || bookingsRealtimeChannel) return;
@@ -69,13 +92,15 @@ function normalizeBooking(row){
 
 function getBookings(){
   try{
-    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    return Array.isArray(stored) ? stored.filter(isBookingVisible) : [];
   }catch(e){
     return [];
   }
 }
 function saveBookings(list){
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  const visible = Array.isArray(list) ? list.filter(isBookingVisible) : [];
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(visible));
 }
 function mergeBookingLists(localList = [], remoteList = []){
   const map = new Map();
@@ -98,7 +123,7 @@ async function syncSupabaseBookings(){
     if (response.ok) {
       const data = await response.json().catch(() => null);
       if (Array.isArray(data)) {
-        const remoteBookings = data.map(normalizeBooking);
+        const remoteBookings = data.map(normalizeBooking).filter(isBookingVisible);
         if (remoteBookings.length || !localBookings.length) {
           saveBookings(remoteBookings);
           return remoteBookings;
@@ -117,7 +142,7 @@ async function syncSupabaseBookings(){
       console.error("Supabase fetch error:", error);
       return localBookings;
     }
-    const remoteBookings = (data || []).map(normalizeBooking);
+    const remoteBookings = (data || []).map(normalizeBooking).filter(isBookingVisible);
     if (remoteBookings.length || !localBookings.length) {
       saveBookings(remoteBookings);
       return remoteBookings;
@@ -420,7 +445,7 @@ function renderSlotBoard(){
       html += `<button type="button" class="slot-btn ${selected ? "selected" : ""}"
                  ${taken ? "disabled" : ""}
                  data-court="${court}" data-hour="${hour}" data-time="${time}">
-                 ${time}${taken ? "" : ""}
+                 ${taken ? "Booked" : time}
                </button>`;
     });
     html += `</div></div>`;
@@ -504,12 +529,13 @@ function renderOrderSummary(){
   const range = getSelectedHourRange(wizardState.selectedHours);
   const hours = range.duration || 0;
   const timeLabel = hours ? range.label : "";
-  const total = PRICE_PER_HOUR * hours;
+  const total = calculateBookingTotalFromSelectedHours(wizardState.selectedHours);
   box.innerHTML = `
     <div><span>Name</span><span>${wizardState.name}</span></div>
     <div><span>Court</span><span>${wizardState.court}</span></div>
     <div><span>Date</span><span>${formatDateNice(wizardState.date)}</span></div>
     <div><span>Time</span><span>${timeLabel}</span></div>
+    <div><span>Rate</span><span>${hours ? '₱150/hr before 6 PM · ₱250/hr from 6 PM onward' : '—'}</span></div>
     <div class="total"><span>Total (${hours} hr${hours>1?"s":""})</span><span>${CURRENCY}${total}</span></div>
   `;
 }
@@ -523,6 +549,12 @@ document.getElementById("confirmBooking").addEventListener("click", async () => 
   const confirmBtn = document.getElementById("confirmBooking");
   confirmBtn.dataset.busy = 'true';
   confirmBtn.disabled = true;
+
+  if (method !== 'GCash' && method !== 'Bank transfer') {
+    err.textContent = 'This payment method is not available.';
+    err.classList.add('show');
+    return;
+  }
 
   let proofFile = null;
   if(method === 'GCash'){
@@ -554,7 +586,7 @@ document.getElementById("confirmBooking").addEventListener("click", async () => 
   const start = range.start;
   const end = range.endExclusive;
   const timeStr = range.label;
-  const amount = PRICE_PER_HOUR * hours;
+  const amount = calculateBookingTotalFromSelectedHours(wizardState.selectedHours);
 
   let paymentProof = "";
   let paymentProofName = "";
@@ -583,7 +615,7 @@ document.getElementById("confirmBooking").addEventListener("click", async () => 
     paymentProof: paymentProof,
     paymentProofName: paymentProofName,
     amount: amount,
-    status: method === "Cash on arrival" ? "Pending" : "Confirmed",
+    status: "Confirmed",
     createdAt: new Date().toISOString()
   };
 
@@ -630,7 +662,7 @@ document.getElementById("bookAnother").addEventListener("click", () => {
     date: null,
     time: null,
     hour: null,
-    payMethod: "Cash on arrival",
+    payMethod: "GCash",
     selectedHours: []
   };
 
@@ -641,7 +673,7 @@ document.getElementById("bookAnother").addEventListener("click", () => {
   document.getElementById("selectionSummary").hidden = true;
 
   document.querySelectorAll('input[name="payMethod"]').forEach(r => {
-    r.checked = r.value === "Cash on arrival";
+    r.checked = r.value === "GCash";
   });
 
   document.querySelectorAll('.payment-proof-upload input[type="file"]').forEach(input => {
@@ -753,8 +785,7 @@ function showDayDetail(iso){
       if(booking) {
         html += `<div class="slot-card booked">
                   <div class="slot-court">${court}</div>
-                  <div class="slot-name">${booking.name}</div>
-                  <div class="slot-phone">${booking.phone}</div>
+                  <div class="slot-name">Booked</div>
                 </div>`;
       } else {
         html += `<div class="slot-card open">
@@ -783,9 +814,9 @@ function renderSheet(){
 
   if(q){
     list = list.filter(b =>
-      b.name.toLowerCase().includes(q) ||
-      b.court.toLowerCase().includes(q) ||
-      b.date.includes(q)
+      (b.name || "").toLowerCase().includes(q) ||
+      (b.court || "").toLowerCase().includes(q) ||
+      (b.date || "").includes(q)
     );
   }
 
@@ -799,8 +830,8 @@ function renderSheet(){
   body.innerHTML = list.map((b, i) => `
     <tr>
       <td>${i+1}</td>
-      <td>${b.name}</td>
-      <td>${b.phone}</td>
+      <td>Booked</td>
+      <td>Hidden</td>
       <td>${b.court}</td>
       <td>${b.date}</td>
       <td>${b.time}</td>
@@ -833,6 +864,7 @@ if(supabase){
 
 function updatePaymentPreview(){
   const method = document.querySelector('input[name="payMethod"]:checked')?.value;
+  const note = document.getElementById('paymentMethodNote');
   document.querySelectorAll('.pay-option').forEach(option => {
     const radio = option.querySelector('input[name="payMethod"]');
     option.classList.toggle('selected', radio && radio.value === method);
@@ -841,6 +873,18 @@ function updatePaymentPreview(){
       qr.hidden = true;
     }
   });
+
+  if (method === 'Cash on arrival' || !method) {
+    if (note) {
+      note.hidden = false;
+      note.textContent = 'This payment method is not available.';
+    }
+    const gcash = document.querySelector('input[name="payMethod"][value="GCash"]');
+    if (gcash) gcash.checked = true;
+    return;
+  }
+
+  if (note) note.hidden = true;
 
   if(method === 'GCash' || method === 'Bank transfer'){
     const selectedQr = document.querySelector('.pay-option.selected .payment-qr[data-method="' + method + '"]');

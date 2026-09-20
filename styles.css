@@ -322,8 +322,8 @@ main{ max-width:1080px; margin:0 auto; padding:0 24px 80px; }
   color:var(--white); -webkit-text-fill-color:var(--white);
 }
 .slot-btn:disabled{
-  background:#F1F1EF; color:#B7BDB8; border-color:#E6E7E4;
-  cursor:not-allowed; text-decoration:line-through;
+  background:#F1F1EF; color:#7B807A; border-color:#E6E7E4;
+  cursor:not-allowed; text-decoration:none; opacity:0.95;
 }
 
 .selection-summary{
@@ -587,6 +587,7 @@ main{ max-width:1080px; margin:0 auto; padding:0 24px 80px; }
   display: flex;
   flex-direction: column;
   justify-content: center;
+  align-items: center;
   gap: 6px;
 }
 .slot-card.open{
@@ -603,10 +604,25 @@ main{ max-width:1080px; margin:0 auto; padding:0 24px 80px; }
   background: linear-gradient(135deg, var(--danger-bg) 0%, #FDD5CC 100%);
   border-color: #F0C9BF;
   color: var(--danger);
+  text-align: center;
+  justify-content: center;
+  gap: 8px;
 }
 .slot-card.booked:hover{
   transform: translateY(-4px);
   box-shadow: 0 8px 20px rgba(140, 47, 30, 0.15);
+}
+.slot-card.booked .slot-court,
+.slot-card.booked .slot-name,
+.slot-card.booked .slot-status{
+  width: 100%;
+  text-align: center;
+}
+.slot-card.booked .slot-name{
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  line-height: 1.1;
+  font-weight: 600;
 }
 .slot-court{
   font-family: var(--font-mono);
@@ -615,6 +631,7 @@ main{ max-width:1080px; margin:0 auto; padding:0 24px 80px; }
   text-transform: uppercase;
   letter-spacing: 0.05em;
   opacity: 0.7;
+  text-align: center;
 }
 .slot-name{
   font-family: var(--font-display);
@@ -622,16 +639,19 @@ main{ max-width:1080px; margin:0 auto; padding:0 24px 80px; }
   font-size: 0.9rem;
   line-height: 1.2;
   word-break: break-word;
+  text-align: center;
 }
 .slot-phone{
   font-family: var(--font-mono);
   font-size: 0.7rem;
   opacity: 0.6;
+  text-align: center;
 }
 .slot-status{
   font-family: var(--font-display);
   font-weight: 600;
   font-size: 0.85rem;
+  text-align: center;
 }
 
 .sheet-toolbar{

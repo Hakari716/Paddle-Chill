@@ -10,7 +10,11 @@ export default async function handler(req, res) {
       method: 'GET'
     });
 
-    const normalized = Array.isArray(rows) ? rows.map((row) => ({
+    const visibleRows = Array.isArray(rows)
+      ? rows.filter((row) => !(row.status === 'Cancelled' || row.is_deleted || row.deleted || row.deleted_at))
+      : [];
+
+    const normalized = visibleRows.map((row) => ({
       id: row.id,
       name: row.customer_name || row.name || '',
       phone: row.phone || '',
@@ -20,13 +24,13 @@ export default async function handler(req, res) {
       hourStart: row.start_hour ?? row.hourStart,
       hourEnd: row.end_hour ?? row.hourEnd,
       duration: row.duration || 1,
-      payment: row.payment_method || row.payment || 'Cash on arrival',
+      payment: row.payment_method || row.payment || 'GCash',
       paymentProof: row.payment_proof_url || row.paymentProof || '',
       paymentProofName: row.payment_proof_name || row.paymentProofName || '',
       amount: Number(row.amount ?? row.total ?? 0),
       status: row.status || 'Pending',
       createdAt: row.created_at || row.createdAt || new Date().toISOString()
-    })) : [];
+    }));
 
     return res.status(200).json(normalized);
   } catch (error) {
