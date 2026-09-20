@@ -33,8 +33,6 @@ export default async function handler(req, res) {
 
     const normalized = visibleRows.map((row) => ({
       id: row.id,
-      name: row.customer_name || row.name || '',
-      phone: row.phone || '',
       court: row.court,
       date: normalizeDateValue(row.booking_date || row.date),
       time: row.time || '',
@@ -42,8 +40,6 @@ export default async function handler(req, res) {
       hourEnd: row.end_hour ?? row.hourEnd,
       duration: row.duration || 1,
       payment: row.payment_method || row.payment || 'GCash',
-      paymentProof: row.payment_proof_url || row.paymentProof || '',
-      paymentProofName: row.payment_proof_name || row.paymentProofName || '',
       amount: Number(row.amount ?? row.total ?? 0),
       status: row.status || 'Pending',
       createdAt: row.created_at || row.createdAt || new Date().toISOString()

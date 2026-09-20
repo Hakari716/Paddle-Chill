@@ -147,6 +147,12 @@ function formatCurrency(value){
   return `₱${Number(value || 0).toLocaleString()}`;
 }
 
+function escapeHtml(value){
+  return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[ch]));
+}
+
 function formatDateNice(iso){
   if (!iso || typeof iso !== 'string') return 'Date unavailable';
 
@@ -245,23 +251,23 @@ function renderAdminTable(){
   tbody.innerHTML = filtered.map((b, index) => `
     <tr>
       <td>${index + 1}</td>
-      <td>${b.name}</td>
-      <td>${b.phone}</td>
-      <td>${b.court}</td>
+      <td>${escapeHtml(b.name)}</td>
+      <td>${escapeHtml(b.phone)}</td>
+      <td>${escapeHtml(b.court)}</td>
       <td>${formatDateNice(b.date || b.booking_date)}</td>
-      <td>${b.time || '—'}</td>
-      <td>${b.payment || 'Cash on arrival'}</td>
+      <td>${escapeHtml(b.time) || '—'}</td>
+      <td>${escapeHtml(b.payment) || 'Cash on arrival'}</td>
       <td>
-        ${b.paymentProof ? `<img class="proof-thumb" src="${b.paymentProof}" alt="${b.paymentProofName || 'Payment proof'}" data-role="view-proof" data-proof="${encodeURIComponent(b.paymentProof)}" />` : `<span class="proof-empty">—</span>`}
+        ${b.paymentProof ? `<img class="proof-thumb" src="${escapeHtml(b.paymentProof)}" alt="${escapeHtml(b.paymentProofName || 'Payment proof')}" data-role="view-proof" data-proof="${encodeURIComponent(b.paymentProof)}" />` : `<span class="proof-empty">—</span>`}
       </td>
       <td>${formatCurrency(b.amount)}</td>
-      <td><span class="status-pill ${b.status === 'Confirmed' ? 'status-confirmed' : 'status-pending'}">${b.status}</span></td>
+      <td><span class="status-pill ${b.status === 'Confirmed' ? 'status-confirmed' : 'status-pending'}">${escapeHtml(b.status)}</span></td>
       <td>
         <div class="admin-actions-cell">
-          <button class="admin-table-action" type="button" data-role="toggle-status" data-id="${b.id}">
+          <button class="admin-table-action" type="button" data-role="toggle-status" data-id="${escapeHtml(b.id)}">
             ${b.status === 'Confirmed' ? 'Mark pending' : 'Mark confirmed'}
           </button>
-          <button class="admin-remove-btn" type="button" data-role="remove-booking" data-id="${b.id}" title="Move booking to bin" aria-label="Move booking to bin">Move to bin</button>
+          <button class="admin-remove-btn" type="button" data-role="remove-booking" data-id="${escapeHtml(b.id)}" title="Move booking to bin" aria-label="Move booking to bin">Move to bin</button>
         </div>
       </td>
     </tr>
@@ -367,18 +373,18 @@ function renderBinTable(){
   tbody.innerHTML = deletedBookings.map((b, index) => `
     <tr>
       <td>${index + 1}</td>
-      <td>${b.name}</td>
-      <td>${b.phone}</td>
-      <td>${b.court}</td>
+      <td>${escapeHtml(b.name)}</td>
+      <td>${escapeHtml(b.phone)}</td>
+      <td>${escapeHtml(b.court)}</td>
       <td>${formatDateNice(b.date || b.booking_date)}</td>
-      <td>${b.time || '—'}</td>
-      <td>${b.payment || 'Cash on arrival'}</td>
+      <td>${escapeHtml(b.time) || '—'}</td>
+      <td>${escapeHtml(b.payment) || 'Cash on arrival'}</td>
       <td>${formatCurrency(b.amount)}</td>
       <td><span class="status-pill status-pending">Cancelled</span></td>
       <td>
         <div class="admin-actions-cell">
-          <button class="admin-table-action" type="button" data-role="restore-booking" data-id="${b.id}">Restore</button>
-          <button class="admin-remove-btn" type="button" data-role="delete-permanent" data-id="${b.id}" title="Delete permanently" aria-label="Delete permanently">Delete permanently</button>
+          <button class="admin-table-action" type="button" data-role="restore-booking" data-id="${escapeHtml(b.id)}">Restore</button>
+          <button class="admin-remove-btn" type="button" data-role="delete-permanent" data-id="${escapeHtml(b.id)}" title="Delete permanently" aria-label="Delete permanently">Delete permanently</button>
         </div>
       </td>
     </tr>

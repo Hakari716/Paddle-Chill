@@ -212,27 +212,6 @@ async function addBooking(booking){
   await syncSupabaseBookings();
   return [booking];
 }
-async function removeBooking(id){
-  if(!id) return;
-  const targetId = String(id).trim();
-  if(!targetId) return;
-
-  if(supabase){
-    const { data: removed, error } = await supabase.from(BOOKINGS_TABLE).delete().eq("id", targetId).select("id");
-    if(error){
-      console.error("Supabase delete error:", error);
-      saveBookings(getBookings().filter(b => String(b.id) !== targetId));
-      return;
-    }
-    if(!removed || removed.length !== 1){
-      console.warn(`Expected to remove 1 booking but removed ${removed ? removed.length : 0}. Check for duplicate ids in the bookings table.`);
-    }
-  } else {
-    saveBookings(getBookings().filter(b => String(b.id) !== targetId));
-  }
-
-  await syncSupabaseBookings();
-}
 function getBookingHourRange(booking){
   const start = Number(booking?.hourStart ?? 0);
   const end = Number(booking?.hourEnd ?? ((start || 0) + (Number(booking?.duration) || 1)));
@@ -250,6 +229,11 @@ function isHourTaken(court, date, hour){
 }
 
 function pad(n){ return n.toString().padStart(2,"0"); }
+function escapeHtml(value){
+  return String(value ?? "").replace(/[&<>"']/g, (ch) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[ch]));
+}
 function toTimeLabel(hour){
   const normalized = ((hour % 24) + 24) % 24;
   const h12 = ((normalized + 11) % 12) + 1;
@@ -566,8 +550,8 @@ function renderOrderSummary(){
   const timeLabel = hours ? range.label : "";
   const total = calculateBookingTotalFromSelectedHours(wizardState.selectedHours);
   box.innerHTML = `
-    <div><span>Name</span><span>${wizardState.name}</span></div>
-    <div><span>Court</span><span>${wizardState.court}</span></div>
+    <div><span>Name</span><span>${escapeHtml(wizardState.name)}</span></div>
+    <div><span>Court</span><span>${escapeHtml(wizardState.court)}</span></div>
     <div><span>Date</span><span>${formatDateNice(wizardState.date)}</span></div>
     <div><span>Time</span><span>${timeLabel}</span></div>
     <div><span>Rate</span><span>${hours ? '₱150/hr before 6 PM · ₱250/hr from 6 PM onward' : '—'}</span></div>
@@ -678,14 +662,14 @@ document.getElementById("confirmBooking").addEventListener("click", async () => 
 
 function renderConfirmation(b){
   document.getElementById("confirmDetails").innerHTML = `
-    <div><span>Booking ref</span><span>${b.id}</span></div>
-    <div><span>Name</span><span>${b.name}</span></div>
-    <div><span>Court</span><span>${b.court}</span></div>
+    <div><span>Booking ref</span><span>${escapeHtml(b.id)}</span></div>
+    <div><span>Name</span><span>${escapeHtml(b.name)}</span></div>
+    <div><span>Court</span><span>${escapeHtml(b.court)}</span></div>
     <div><span>Date</span><span>${formatDateNice(b.date)}</span></div>
-    <div><span>Time</span><span>${b.time}</span></div>
-    <div><span>Payment</span><span>${b.payment}</span></div>
+    <div><span>Time</span><span>${escapeHtml(b.time)}</span></div>
+    <div><span>Payment</span><span>${escapeHtml(b.payment)}</span></div>
     <div><span>Amount</span><span>${CURRENCY}${b.amount}</span></div>
-    <div><span>Status</span><span>${b.status}</span></div>
+    <div><span>Status</span><span>${escapeHtml(b.status)}</span></div>
   `;
 }
 
@@ -866,25 +850,15 @@ function renderSheet(){
     <tr>
       <td>${i+1}</td>
       <td>Booked</td>
-      <td>${b.court}</td>
-      <td>${b.date}</td>
-      <td>${b.time}</td>
-      <td>${b.payment}</td>
+      <td>${escapeHtml(b.court)}</td>
+      <td>${escapeHtml(b.date)}</td>
+      <td>${escapeHtml(b.time)}</td>
+      <td>${escapeHtml(b.payment)}</td>
       <td>${CURRENCY}${b.amount}</td>
-      <td><span class="status-pill ${b.status === "Confirmed" ? "status-confirmed" : "status-pending"}">${b.status}</span></td>
-      <td><button class="remove-btn" data-id="${b.id}">Remove</button></td>
+      <td><span class="status-pill ${b.status === "Confirmed" ? "status-confirmed" : "status-pending"}">${escapeHtml(b.status)}</span></td>
+      <td></td>
     </tr>
   `).join("");
-
-  body.querySelectorAll(".remove-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      if(confirm("Remove this booking?")){
-        removeBooking(btn.dataset.id);
-        renderSheet();
-        showToast("Booking removed.");
-      }
-    });
-  });
 }
 
 document.getElementById("inputDate").min = todayISO();
