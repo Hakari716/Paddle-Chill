@@ -1,5 +1,22 @@
 import { supabaseServiceRequest } from './_supabase.js';
 
+function normalizeDateValue(value) {
+  if (!value && value !== 0) return '';
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10);
+  }
+  const raw = String(value).trim();
+  if (!raw) return '';
+  const isoCandidate = raw.includes('T') ? raw.split('T')[0] : raw;
+  const match = isoCandidate.match(/^\d{4}-\d{2}-\d{2}$/);
+  if (match) return isoCandidate;
+  const parsed = new Date(raw);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toISOString().slice(0, 10);
+  }
+  return raw;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ ok: false, message: 'Method not allowed.' });
@@ -19,7 +36,7 @@ export default async function handler(req, res) {
       name: row.customer_name || row.name || '',
       phone: row.phone || '',
       court: row.court,
-      date: row.booking_date || row.date,
+      date: normalizeDateValue(row.booking_date || row.date),
       time: row.time || '',
       hourStart: row.start_hour ?? row.hourStart,
       hourEnd: row.end_hour ?? row.hourEnd,

@@ -64,10 +64,27 @@ function refreshScheduleViews(){
   }
 }
 
+function normalizeDateValue(value){
+  if (!value && value !== 0) return "";
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10);
+  }
+  const raw = String(value).trim();
+  if (!raw) return "";
+  const isoCandidate = raw.includes('T') ? raw.split('T')[0] : raw;
+  const match = isoCandidate.match(/^\d{4}-\d{2}-\d{2}$/);
+  if (match) return isoCandidate;
+  const parsed = new Date(raw);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toISOString().slice(0, 10);
+  }
+  return raw;
+}
+
 function normalizeBooking(row){
   const hourStart = Number(row.start_hour ?? row.hourStart ?? 0);
   const hourEnd = Number(row.end_hour ?? row.endHour ?? row.hourEnd ?? ((hourStart || 0) + (Number(row.duration) || 1)));
-  const bookingDate = row.booking_date ?? row.date ?? "";
+  const bookingDate = normalizeDateValue(row.booking_date ?? row.date ?? "");
   const customerName = row.customer_name ?? row.name ?? "";
   const paymentMethod = row.payment_method ?? row.payment ?? "Cash on arrival";
 
@@ -831,7 +848,6 @@ function renderSheet(){
     <tr>
       <td>${i+1}</td>
       <td>Booked</td>
-      <td>Hidden</td>
       <td>${b.court}</td>
       <td>${b.date}</td>
       <td>${b.time}</td>
