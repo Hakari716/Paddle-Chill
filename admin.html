@@ -78,6 +78,35 @@
       font-size: 0.98rem;
       font-family: var(--font-body);
     }
+    .admin-actions input,
+    .admin-actions select {
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1.5px solid var(--line-strong);
+      font-size: 0.92rem;
+      font-family: var(--font-body);
+      color: var(--ink);
+      background: var(--white);
+    }
+    .admin-actions input:focus,
+    .admin-actions select:focus {
+      outline: none;
+      border-color: var(--green-700);
+      box-shadow: 0 0 0 3px var(--green-100);
+    }
+    .admin-bin-section {
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 1.5px dashed var(--line-strong);
+    }
+    .admin-bin-section .admin-header {
+      margin-bottom: 12px;
+    }
+    .admin-bin-section h2 {
+      font-family: var(--font-display);
+      font-size: 1.3rem;
+      margin: 0;
+    }
     .admin-header {
       display: flex;
       align-items: center;
@@ -226,6 +255,7 @@
       border-radius: var(--radius);
       box-shadow: var(--shadow);
       overflow: auto;
+      max-height: 560px;
       margin-bottom: 60px;
     }
     .sheet-table { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 0.84rem; min-width: 820px; }
@@ -365,8 +395,17 @@
         <div class="admin-header">
           <h1>All bookings</h1>
           <div class="admin-actions">
-            <input id="adminSearch" type="text" placeholder="Search by name, court, or date…" style="min-width:240px; padding:10px 12px; border-radius:8px; border:1.5px solid var(--line-strong);" />
+            <input id="adminSearch" type="text" placeholder="Search by name, court, or date…" style="min-width:240px;" />
+            <select id="adminSort">
+              <option value="date-asc">Date (soonest first)</option>
+              <option value="date-desc">Date (latest first)</option>
+              <option value="name-asc">Name (A–Z)</option>
+              <option value="court-asc">Court</option>
+              <option value="status-asc">Status</option>
+              <option value="amount-desc">Amount (high–low)</option>
+            </select>
             <button class="btn btn-ghost" id="refreshBookings" type="button">Refresh</button>
+            <button class="btn btn-ghost" id="toggleBin" type="button"><span id="binToggleLabel">Bin</span> (<span id="binCount">0</span>)</button>
           </div>
         </div>
 
@@ -404,6 +443,32 @@
             </thead>
             <tbody id="adminTableBody"></tbody>
           </table>
+        </div>
+
+        <div class="admin-bin-section admin-hidden" id="binSection">
+          <div class="admin-header">
+            <h2>Recently deleted</h2>
+            <p class="hint">Bookings moved to the bin stay in the database and can be restored.</p>
+          </div>
+          <div class="sheet-wrap">
+            <table class="sheet-table" id="binTable">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Name</th>
+                  <th>Phone</th>
+                  <th>Court</th>
+                  <th>Date</th>
+                  <th>Time</th>
+                  <th>Payment</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="binTableBody"></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </section>

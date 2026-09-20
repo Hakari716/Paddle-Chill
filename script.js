@@ -117,7 +117,13 @@ function getBookings(){
 }
 function saveBookings(list){
   const visible = Array.isArray(list) ? list.filter(isBookingVisible) : [];
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(visible));
+  // Proof images are base64 and can be large; the public page never displays them, so drop them before caching to avoid exceeding localStorage quota.
+  const lightweight = visible.map(({ paymentProof, paymentProofName, ...rest }) => rest);
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(lightweight));
+  } catch (e) {
+    console.warn("Could not cache bookings locally (storage quota):", e);
+  }
 }
 function mergeBookingLists(localList = [], remoteList = []){
   const map = new Map();
@@ -494,6 +500,16 @@ function renderSlotBoard(){
         for(let current = start; current <= end; current++) {
           expandedRange.push(current);
         }
+
+        const blockedHours = expandedRange.filter((slotHour) => isHourTaken(court, wizardState.date, slotHour));
+        if (blockedHours.length) {
+          const err = document.getElementById("error-2");
+          const blockedLabels = blockedHours.map((slotHour) => toTimeLabel(slotHour)).join(", ");
+          err.textContent = `${court} already has a booking for ${blockedLabels}. Please choose another available time.`;
+          err.classList.add("show");
+          return;
+        }
+
         wizardState.selectedHours = expandedRange;
       }
 
@@ -502,6 +518,8 @@ function renderSlotBoard(){
         return;
       }
 
+      const err = document.getElementById("error-2");
+      if (err) err.classList.remove("show");
       renderSlotBoard();
       updateSelectedSummary();
     });

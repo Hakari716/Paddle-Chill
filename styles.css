@@ -28,6 +28,27 @@
 *{ box-sizing:border-box; }
 html{ scroll-behavior:smooth; }
 
+html, body {
+  scrollbar-width: thin;
+  scrollbar-color: var(--green-600) var(--green-050);
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: var(--green-050);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--green-600);
+  border-radius: 999px;
+  border: 2px solid var(--green-050);
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--green-700);
+}
+
 body{
   margin:0;
   font-family:var(--font-body);
@@ -619,10 +640,16 @@ main{ max-width:1080px; margin:0 auto; padding:0 24px 80px; }
   text-align: center;
 }
 .slot-card.booked .slot-name{
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-size: 0.85rem;
   line-height: 1.1;
-  font-weight: 400;
+  font-weight: 600;
+}
+
+.slot-card.booked .slot-status,
+.slot-card.open .slot-status{
+  font-family: var(--font-body);
+  font-weight: 600;
 }
 .slot-court{
   font-family: var(--font-mono);

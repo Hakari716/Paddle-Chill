@@ -28,6 +28,7 @@ function setupAdminRealtime(){
     try {
       await syncSupabaseBookings();
       if (typeof renderAdminTable === 'function') renderAdminTable();
+      if (typeof renderBinTable === 'function') renderBinTable();
     } catch (e) {
       console.warn('Admin booking sync failed:', e);
     }
@@ -76,16 +77,15 @@ function normalizeBookingRow(row) {
   };
 }
 
+
+let cachedAdminBookings = [];
+
 function getBookings(){
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-  } catch (e) {
-    return [];
-  }
+  return cachedAdminBookings;
 }
 
 function saveBookings(list){
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  cachedAdminBookings = Array.isArray(list) ? list : [];
 }
 
 function mergeBookingLists(localList = [], remoteList = []){
@@ -104,22 +104,28 @@ function mergeBookingLists(localList = [], remoteList = []){
 
 async function syncSupabaseBookings(){
   const localBookings = getBookings();
+  const token = getAdminToken();
 
-  try {
-    const response = await fetch('/api/bookings', { headers: { 'Cache-Control': 'no-cache' } });
-    if (response.ok) {
-      const data = await response.json().catch(() => null);
-      if (Array.isArray(data)) {
-        const normalized = data.map(normalizeBookingRow);
-        if (normalized.length || !localBookings.length) {
-          saveBookings(normalized);
-          return normalized;
+  if (token) {
+    try {
+      const response = await fetch(`/api/admin-bookings?token=${encodeURIComponent(token)}`, { headers: { 'Cache-Control': 'no-cache' } });
+      if (response.ok) {
+        const data = await response.json().catch(() => null);
+        if (Array.isArray(data)) {
+          const normalized = data.map(normalizeBookingRow);
+          if (normalized.length || !localBookings.length) {
+            saveBookings(normalized);
+            return normalized;
+          }
+          return localBookings;
         }
+      } else if (response.status === 401) {
+        logoutAdmin();
         return localBookings;
       }
+    } catch (error) {
+      console.warn('Admin booking server sync unavailable:', error);
     }
-  } catch (error) {
-    console.warn('Admin booking server sync unavailable:', error);
   }
 
   if(!supabase) return localBookings;
@@ -195,11 +201,31 @@ function renderStats(bookings){
   document.getElementById('statPending').textContent = visibleBookings.filter(b => b.status === 'Pending').length;
 }
 
+function sortBookings(list, sortKey){
+  const sorted = list.slice();
+  switch (sortKey) {
+    case 'date-desc':
+      return sorted.sort((a, b) => `${b.date}${b.time}`.localeCompare(`${a.date}${a.time}`));
+    case 'name-asc':
+      return sorted.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    case 'court-asc':
+      return sorted.sort((a, b) => (a.court || '').localeCompare(b.court || '') || `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
+    case 'status-asc':
+      return sorted.sort((a, b) => (a.status || '').localeCompare(b.status || '') || `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
+    case 'amount-desc':
+      return sorted.sort((a, b) => Number(b.amount || 0) - Number(a.amount || 0));
+    case 'date-asc':
+    default:
+      return sorted.sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
+  }
+}
+
 function renderAdminTable(){
   const searchTerm = (document.getElementById('adminSearch')?.value || '').toLowerCase();
+  const sortKey = document.getElementById('adminSort')?.value || 'date-asc';
   const tbody = document.getElementById('adminTableBody');
   const latestBookings = getBookings().filter(b => String(b.status || '').trim() !== 'Cancelled');
-  const bookings = latestBookings.slice().sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
+  const bookings = sortBookings(latestBookings, sortKey);
 
   const filtered = bookings.filter((b) => {
     const haystack = `${b.name} ${b.phone} ${b.court} ${b.date} ${b.time} ${b.payment}`.toLowerCase();
@@ -309,6 +335,116 @@ function renderAdminTable(){
         saveBookings(existing.map(item => item.id === id ? { ...item, status: 'Cancelled' } : item));
         await syncSupabaseBookings();
         renderAdminTable();
+        renderBinTable();
+      } finally {
+        button.disabled = false;
+      }
+    });
+  });
+}
+
+function renderBinTable(){
+  const tbody = document.getElementById('binTableBody');
+  const binCount = document.getElementById('binCount');
+  if (!tbody) return;
+
+  const deletedBookings = getBookings()
+    .filter(b => String(b.status || '').trim() === 'Cancelled')
+    .slice()
+    .sort((a, b) => `${b.date}${b.time}`.localeCompare(`${a.date}${a.time}`));
+
+  if (binCount) binCount.textContent = deletedBookings.length;
+
+  if (!deletedBookings.length) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="10" style="text-align:center; padding:28px; color:var(--ink-soft);">Bin is empty.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = deletedBookings.map((b, index) => `
+    <tr>
+      <td>${index + 1}</td>
+      <td>${b.name}</td>
+      <td>${b.phone}</td>
+      <td>${b.court}</td>
+      <td>${formatDateNice(b.date || b.booking_date)}</td>
+      <td>${b.time || '—'}</td>
+      <td>${b.payment || 'Cash on arrival'}</td>
+      <td>${formatCurrency(b.amount)}</td>
+      <td><span class="status-pill status-pending">Cancelled</span></td>
+      <td>
+        <div class="admin-actions-cell">
+          <button class="admin-table-action" type="button" data-role="restore-booking" data-id="${b.id}">Restore</button>
+          <button class="admin-remove-btn" type="button" data-role="delete-permanent" data-id="${b.id}" title="Delete permanently" aria-label="Delete permanently">Delete permanently</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+
+  tbody.querySelectorAll('[data-role="restore-booking"]').forEach(button => {
+    button.addEventListener('click', async () => {
+      const id = String(button.dataset.id || '').trim();
+      if (!id || button.disabled) return;
+      if (!confirm('Restore this booking? It will become active again.')) return;
+
+      button.disabled = true;
+      try {
+        const response = await fetch('/api/admin-restore-booking', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, token: getAdminToken() })
+        });
+        const result = await response.json().catch(() => ({ ok: false }));
+
+        if (!response.ok || !result.ok) {
+          if (response.status === 401) {
+            logoutAdmin();
+          }
+          console.error('Admin restore error:', result.message);
+          return;
+        }
+
+        const existing = getBookings();
+        saveBookings(existing.map(item => item.id === id ? { ...item, status: 'Pending' } : item));
+        await syncSupabaseBookings();
+        renderAdminTable();
+        renderBinTable();
+      } finally {
+        button.disabled = false;
+      }
+    });
+  });
+
+  tbody.querySelectorAll('[data-role="delete-permanent"]').forEach(button => {
+    button.addEventListener('click', async () => {
+      const id = String(button.dataset.id || '').trim();
+      if (!id || button.disabled) return;
+      if (!confirm('Permanently delete this booking? This cannot be undone.')) return;
+
+      button.disabled = true;
+      try {
+        const response = await fetch('/api/admin-permanent-delete-booking', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, token: getAdminToken() })
+        });
+        const result = await response.json().catch(() => ({ ok: false }));
+
+        if (!response.ok || !result.ok) {
+          if (response.status === 401) {
+            logoutAdmin();
+          }
+          console.error('Admin permanent delete error:', result.message);
+          alert(result.message || 'Could not permanently delete booking.');
+          return;
+        }
+
+        saveBookings(getBookings().filter(item => item.id !== id));
+        renderAdminTable();
+        renderBinTable();
       } finally {
         button.disabled = false;
       }
@@ -317,13 +453,19 @@ function renderAdminTable(){
 }
 
 async function loadAdminBookings(){
+  const token = getAdminToken();
   try {
-    const response = await fetch('/api/bookings', { headers: { 'Cache-Control': 'no-cache' } });
+    const response = await fetch(`/api/admin-bookings?token=${encodeURIComponent(token)}`, { headers: { 'Cache-Control': 'no-cache' } });
     if (!response.ok) {
+      if (response.status === 401) {
+        logoutAdmin();
+        return;
+      }
       const cached = getBookings();
       if (Array.isArray(cached) && cached.length) {
         saveBookings(cached);
         renderAdminTable();
+        renderBinTable();
       }
       return;
     }
@@ -333,6 +475,7 @@ async function loadAdminBookings(){
       const cached = getBookings();
       if (Array.isArray(cached) && cached.length) {
         renderAdminTable();
+        renderBinTable();
       }
       return;
     }
@@ -340,11 +483,13 @@ async function loadAdminBookings(){
     const normalized = data.map(normalizeBookingRow);
     saveBookings(normalized);
     renderAdminTable();
+    renderBinTable();
   } catch (error) {
     console.warn('Failed to load admin bookings:', error);
     const cached = getBookings();
     if (Array.isArray(cached) && cached.length) {
       renderAdminTable();
+      renderBinTable();
     }
   }
 }
@@ -427,11 +572,28 @@ function initAdmin(){
     searchInput.addEventListener('input', renderAdminTable);
   }
 
+  const sortSelect = document.getElementById('adminSort');
+  if (sortSelect) {
+    sortSelect.addEventListener('change', renderAdminTable);
+  }
+
   if (refreshBtn) {
     refreshBtn.addEventListener('click', async () => {
       refreshBtn.disabled = true;
       await loadAdminBookings();
       refreshBtn.disabled = false;
+    });
+  }
+
+  const toggleBinBtn = document.getElementById('toggleBin');
+  const binSection = document.getElementById('binSection');
+  const binToggleLabel = document.getElementById('binToggleLabel');
+  if (toggleBinBtn && binSection) {
+    toggleBinBtn.addEventListener('click', () => {
+      const isHidden = binSection.classList.contains('admin-hidden');
+      binSection.classList.toggle('admin-hidden', !isHidden);
+      if (binToggleLabel) binToggleLabel.textContent = isHidden ? 'Hide bin' : 'Bin';
+      if (isHidden) renderBinTable();
     });
   }
 
