@@ -234,7 +234,8 @@ function renderAdminTable(){
   const bookings = sortBookings(latestBookings, sortKey);
 
   const filtered = bookings.filter((b) => {
-    const haystack = `${b.name} ${b.phone} ${b.court} ${b.date} ${b.time} ${b.payment}`.toLowerCase();
+    const niceDate = formatDateNice(b.date || b.booking_date);
+    const haystack = `${b.id} ${b.name} ${b.phone} ${b.court} ${b.date} ${niceDate} ${b.time} ${b.payment} ${b.status}`.toLowerCase();
     return haystack.includes(searchTerm);
   });
 

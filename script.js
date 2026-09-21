@@ -177,38 +177,17 @@ async function syncSupabaseBookings(){
   }
 }
 async function addBooking(booking){
-  const payload = {
-    id: booking.id,
-    customer_name: booking.name,
-    phone: booking.phone,
-    court: booking.court,
-    booking_date: booking.date,
-    time: booking.time,
-    start_hour: booking.hourStart,
-    end_hour: booking.hourEnd,
-    duration: booking.duration,
-    payment_method: booking.payment,
-    payment_status: booking.paymentStatus || "pending",
-    status: booking.status || "Pending",
-    amount: booking.amount,
-    payment_proof_url: booking.paymentProof || null,
-    payment_proof_name: booking.paymentProofName || null,
-    created_at: booking.createdAt || new Date().toISOString()
-  };
+  const response = await fetch('/api/create-booking', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(booking)
+  });
+  const result = await response.json().catch(() => ({ ok: false }));
 
-  if(supabase){
-    const { data, error } = await supabase.from(BOOKINGS_TABLE).upsert([payload], { onConflict: "id" }).select();
-    if(error){
-      console.error("Supabase insert error:", error);
-      throw new Error(error?.message || "Could not save booking to Supabase.");
-    }
-    await syncSupabaseBookings();
-    return data;
+  if (!response.ok || !result.ok) {
+    throw new Error(result.message || 'Could not save booking. Please try again.');
   }
 
-  const list = getBookings();
-  list.push(booking);
-  saveBookings(list);
   await syncSupabaseBookings();
   return [booking];
 }
@@ -301,6 +280,9 @@ function switchView(key){
     document.getElementById(id).classList.toggle("active", k === key);
   });
   if(key === "schedule") {
+    if (supabase) {
+      syncSupabaseBookings().then(() => refreshScheduleViews());
+    }
     renderCalendar();
     const focusDate = selectedCalendarDate || wizardState.date || todayISO();
     showDayDetail(focusDate);
@@ -323,6 +305,11 @@ if(typeof window !== "undefined") {
       refreshScheduleViews();
     }
   });
+  // Fallback polling in case realtime push updates are unavailable, so the schedule stays in sync across devices.
+  setInterval(async () => {
+    await syncSupabaseBookings();
+    refreshScheduleViews();
+  }, 6000);
 }
 
 let wizardState = {
@@ -452,7 +439,7 @@ function renderSlotBoard(){
       html += `<button type="button" class="slot-btn ${selected ? "selected" : ""}"
                  ${taken ? "disabled" : ""}
                  data-court="${court}" data-hour="${hour}" data-time="${time}">
-                 ${taken ? "Booked" : time}
+                 ${time}
                </button>`;
     });
     html += `</div></div>`;

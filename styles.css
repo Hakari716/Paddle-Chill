@@ -344,7 +344,7 @@ main{ max-width:1080px; margin:0 auto; padding:0 24px 80px; }
 }
 .slot-btn:disabled{
   background:#F1F1EF; color:#7B807A; border-color:#E6E7E4;
-  cursor:not-allowed; text-decoration:none; opacity:0.95;
+  cursor:not-allowed; text-decoration:line-through; opacity:0.95;
 }
 
 .selection-summary{
